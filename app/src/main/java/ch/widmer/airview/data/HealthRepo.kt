@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
+import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateGroupByDurationRequest
 import androidx.health.connect.client.request.AggregateRequest
@@ -66,15 +67,62 @@ data class Snapshot(
     val weightKg: Double? = null,
     val missing: Set<String> = emptySet(),
     val rings: List<RingDay> = emptyList(),
+    val sources: List<Source> = emptyList(),
+    val activeSources: Set<String> = emptySet(),   // leer = alle
 )
 
-class HealthRepo(context: Context) {
+data class Source(val pkg: String, val label: String, val firstDay: LocalDate, val days: Int)
+
+/** Gewählte Datenquellen (leer = alle). */
+object SourceStore {
+    private fun prefs(c: Context) = c.getSharedPreferences("sources", Context.MODE_PRIVATE)
+    /** null = noch nie gewählt (dann automatisch nur das Band). */
+    fun load(c: Context): Set<String>? = prefs(c).getStringSet("pkgs", null)
+    fun save(c: Context, pkgs: Set<String>) = prefs(c).edit().putStringSet("pkgs", pkgs).apply()
+
+    /** Erkennt die App, über die das Fitbit Air seine Daten schreibt. */
+    fun isBand(s: Source) = listOf("fitbit", "google health").any {
+        s.pkg.lowercase().contains(it) || s.label.lowercase().contains(it)
+    }
+}
+
+class HealthRepo(private val context: Context) {
+    private var origins: Set<DataOrigin> = emptySet()
+
+    /** Welche Apps haben in den letzten 30 Tagen Schritte, Puls, Schlaf oder Kalorien geschrieben? */
+    suspend fun sources(): List<Source> {
+        val now = Instant.now()
+        val range = TimeRangeFilter.between(now.minus(Duration.ofDays(30)), now)
+        val seen = HashMap<String, MutableSet<LocalDate>>()
+        suspend fun <T : Record> scan(k: KClass<T>, time: (T) -> Instant) = runCatching {
+            var token: String? = null
+            do {
+                val r = client.readRecords(ReadRecordsRequest(k, range, pageToken = token))
+                r.records.forEach { seen.getOrPut(it.metadata.dataOrigin.packageName) { HashSet() } += time(it).atZone(zone).toLocalDate() }
+                token = r.pageToken
+            } while (!token.isNullOrEmpty())
+        }
+        scan(StepsRecord::class) { it.startTime }
+        scan(HeartRateRecord::class) { it.startTime }
+        scan(SleepSessionRecord::class) { it.endTime }
+        scan(ActiveCaloriesBurnedRecord::class) { it.startTime }
+        val pm = context.packageManager
+        return seen.map { (pkg, days) ->
+            val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+            Source(pkg, label, days.min(), days.size)
+        }.sortedByDescending { it.days }
+    }
+
     val client: HealthConnectClient = HealthConnectClient.getOrCreate(context)
     private val zone: ZoneId get() = ZoneId.systemDefault()
 
     suspend fun granted(): Set<String> = client.permissionController.getGrantedPermissions()
 
     suspend fun load(): Snapshot {
+        val sources = runCatching { sources() }.getOrDefault(emptyList())
+        val chosen = SourceStore.load(context)
+            ?: sources.filter(SourceStore::isBand).map { it.pkg }.toSet()   // Standard: nur das Band
+        origins = chosen.map { DataOrigin(it) }.toSet()
         val granted = granted()
         fun has(k: KClass<out Record>) = HealthPermission.getReadPermission(k) in granted
         val missing = PERMISSIONS - granted
@@ -87,7 +135,7 @@ class HealthRepo(context: Context) {
         val monthStart = today.minusDays(29).atStartOfDay(zone).toInstant()
         val monthRange = TimeRangeFilter.between(monthStart, now)
 
-        var s = Snapshot(missing = missing.map { it.substringAfterLast('.') }.toSet())
+        var s = Snapshot(missing = missing.map { it.substringAfterLast('.') }.toSet(), sources = sources, activeSources = chosen)
 
         // Heute: Summen
         val metrics = buildSet {
@@ -98,7 +146,7 @@ class HealthRepo(context: Context) {
             if (has(FloorsClimbedRecord::class)) add(FloorsClimbedRecord.FLOORS_CLIMBED_TOTAL)
         }
         if (metrics.isNotEmpty()) runCatching {
-            val a = client.aggregate(AggregateRequest(metrics, todayRange))
+            val a = client.aggregate(AggregateRequest(metrics, todayRange, origins))
             s = s.copy(
                 steps = a[StepsRecord.COUNT_TOTAL] ?: 0,
                 distanceM = a[DistanceRecord.DISTANCE_TOTAL]?.inMeters ?: 0.0,
@@ -119,6 +167,7 @@ class HealthRepo(context: Context) {
                     weekMetrics,
                     TimeRangeFilter.between(weekStartLocal, LocalDateTime.now(zone)),
                     Period.ofDays(1),
+                    origins,
                 )
             )
             val byDate = rows.associateBy { it.startTime.toLocalDate() }
@@ -142,13 +191,13 @@ class HealthRepo(context: Context) {
             val list = sessions.map { e ->
                 val range = TimeRangeFilter.between(e.startTime, e.endTime)
                 val kcal = if (has(ActiveCaloriesBurnedRecord::class)) runCatching {
-                    client.aggregate(AggregateRequest(setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), range))[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+                    client.aggregate(AggregateRequest(setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), range, origins))[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
                 }.getOrNull() else null
                 val dist = if (has(DistanceRecord::class)) runCatching {
-                    client.aggregate(AggregateRequest(setOf(DistanceRecord.DISTANCE_TOTAL), range))[DistanceRecord.DISTANCE_TOTAL]?.inMeters
+                    client.aggregate(AggregateRequest(setOf(DistanceRecord.DISTANCE_TOTAL), range, origins))[DistanceRecord.DISTANCE_TOTAL]?.inMeters
                 }.getOrNull() else null
                 val hr = if (has(HeartRateRecord::class)) runCatching {
-                    client.aggregate(AggregateRequest(setOf(HeartRateRecord.BPM_AVG), range))[HeartRateRecord.BPM_AVG]
+                    client.aggregate(AggregateRequest(setOf(HeartRateRecord.BPM_AVG), range, origins))[HeartRateRecord.BPM_AVG]
                 }.getOrNull() else null
                 Workout(e.title ?: exerciseName(e.exerciseType), e.exerciseType, e.startTime, e.endTime, kcal, dist, hr)
             }
@@ -204,16 +253,16 @@ class HealthRepo(context: Context) {
             val range = TimeRangeFilter.between(from, to)
 
             val stepCount = if (steps) runCatching {
-                client.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), range))[StepsRecord.COUNT_TOTAL]
+                client.aggregate(AggregateRequest(setOf(StepsRecord.COUNT_TOTAL), range, origins))[StepsRecord.COUNT_TOTAL]
             }.getOrNull() ?: 0L else 0L
             val move = if (kcal) runCatching {
-                client.aggregate(AggregateRequest(setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), range))[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+                client.aggregate(AggregateRequest(setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL), range, origins))[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
             }.getOrNull() ?: 0.0 else 0.0
 
             // Minute des Tages -> zügig? (≥ 100 Schritte/min oder in einem Training)
             val brisk = HashSet<Long>()
             if (steps) runCatching {
-                client.aggregateGroupByDuration(AggregateGroupByDurationRequest(setOf(StepsRecord.COUNT_TOTAL), range, Duration.ofMinutes(1)))
+                client.aggregateGroupByDuration(AggregateGroupByDurationRequest(setOf(StepsRecord.COUNT_TOTAL), range, Duration.ofMinutes(1), origins))
                     .filter { (it.result[StepsRecord.COUNT_TOTAL] ?: 0) >= 100 }
                     .forEach { brisk += Duration.between(from, it.startTime).toMinutes() }
             }
@@ -232,7 +281,7 @@ class HealthRepo(context: Context) {
         val out = mutableListOf<T>()
         var token: String? = null
         do {
-            val resp = client.readRecords(ReadRecordsRequest(type, range, pageToken = token))
+            val resp = client.readRecords(ReadRecordsRequest(type, range, dataOriginFilter = origins, pageToken = token))
             out += resp.records
             token = resp.pageToken
         } while (!token.isNullOrEmpty())

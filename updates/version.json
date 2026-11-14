@@ -1,7 +1,7 @@
 {
-  "versionCode": 5,
-  "versionName": "1.4",
-  "sha256": "4f007e6dee96aa807cf3f65bf2ffee8f13f5c9fae48061d7ce80d6be551b21e3",
-  "notes": "Gesundheitswerte vergleichen erst ab 4 Messtagen, statt den Wert mit sich selbst.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-5.apk"
+  "versionCode": 6,
+  "versionName": "1.5",
+  "sha256": "f7a08fababf9f4e3d88ffbac8bd8b32cfc52eafe2b4ac3b3b7c981615e71c92a",
+  "notes": "Standardmässig nur noch Daten deines Bands. Oben auf «Heute» siehst und änderst du die Datenquellen.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-6.apk"
 }

@@ -225,6 +225,7 @@ fun Pages(
                     CompositionLocalProvider(
                         LocalPalette provides lerpPalette(pal(page), live, offset.coerceIn(0f, 1f)),
                         LocalReveal provides reveals[page].value,
+                        LocalRefresh provides onRefresh,
                     ) {
                         Column(
                             Modifier.fillMaxSize().graphicsLayer {

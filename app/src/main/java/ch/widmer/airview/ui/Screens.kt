@@ -18,6 +18,8 @@ import androidx.health.connect.client.records.SleepSessionRecord as S
 import ch.widmer.airview.data.DayValue
 import ch.widmer.airview.data.SleepNight
 import ch.widmer.airview.data.Snapshot
+import ch.widmer.airview.data.SourceStore
+import androidx.compose.foundation.clickable
 import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
@@ -74,6 +76,62 @@ fun Note(text: String) {
     Text(text, style = Type.body, color = LocalPalette.current.muted, modifier = Modifier.padding(vertical = 4.dp))
 }
 
+/** Neu laden, z. B. nach dem Ändern der Datenquellen. */
+val LocalRefresh = compositionLocalOf<() -> Unit> { {} }
+
+/** Zeigt, aus welchen Apps die Daten stammen; antippen öffnet die Auswahl. */
+@Composable
+fun SourceLine(s: Snapshot) {
+    val p = LocalPalette.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val refresh = LocalRefresh.current
+    var open by remember { mutableStateOf(false) }
+    val active = s.sources.filter { s.activeSources.isEmpty() || it.pkg in s.activeSources }
+    val label = when {
+        s.sources.isEmpty() -> "Noch keine Datenquellen gefunden"
+        s.activeSources.isEmpty() -> "Daten aus allen Apps"
+        active.isEmpty() -> "Keine Quelle gewählt"
+        else -> "Daten von " + active.joinToString(" und ") { it.label }
+    }
+    Text(
+        label, style = Type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
+        color = p.muted, modifier = Modifier.clickable { open = true }.padding(vertical = 4.dp),
+    )
+    if (open) {
+        var pick by remember { mutableStateOf(if (s.activeSources.isEmpty()) s.sources.map { it.pkg }.toSet() else s.activeSources) }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { open = false },
+            containerColor = p.bar, titleContentColor = p.ink, textContentColor = p.ink,
+            title = { Text("Datenquellen", style = Type.title) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Diese Apps haben in den letzten 30 Tagen Daten in Health Connect geschrieben. Gezählt wird nur, was angehakt ist.",
+                        style = Type.small, color = p.muted)
+                    s.sources.forEach { src ->
+                        val on = src.pkg in pick
+                        Row(Modifier.fillMaxWidth().clickable { pick = if (on) pick - src.pkg else pick + src.pkg }.padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Checkbox(on, { pick = if (on) pick - src.pkg else pick + src.pkg },
+                                colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = p.move, uncheckedColor = p.muted, checkmarkColor = p.bg))
+                            Column {
+                                Text(src.label + if (SourceStore.isBand(src)) " (dein Band)" else "", style = Type.body, color = p.ink)
+                                Text("seit ${src.firstDay.format(DateTimeFormatter.ofPattern("d. MMMM", DE))}, an ${src.days} ${if (src.days == 1) "Tag" else "Tagen"}",
+                                    style = Type.small, color = p.muted)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton({ SourceStore.save(ctx, pick); open = false; refresh() }, enabled = pick.isNotEmpty()) {
+                    Text("Übernehmen", style = Type.title.copy(fontSize = 15.sp), color = p.ink)
+                }
+            },
+            dismissButton = { androidx.compose.material3.TextButton({ open = false }) { Text("Abbrechen", style = Type.body, color = p.muted) } },
+        )
+    }
+}
+
 // ---------- Heute ----------
 
 @Composable
@@ -86,6 +144,7 @@ fun TodayScreen(s: Snapshot) {
     val STEP_GOAL = goals.steps.toDouble()
     Page {
         Text(today.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE)), style = Type.title, color = p.muted)
+        SourceLine(s)
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text((s.steps * r).grouped(), style = Type.numeral.copy(fontSize = 104.sp, lineHeight = 100.sp), color = p.ink)
