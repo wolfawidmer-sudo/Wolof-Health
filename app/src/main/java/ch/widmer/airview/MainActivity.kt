@@ -211,9 +211,10 @@ fun Pages(
 
     // Einblenden pro Seite, jeweils beim ersten Ankommen
     val reveals = remember { tabs.map { Animatable(0f) } }
-    LaunchedEffect(pager.settledPage) {
-        val a = reveals[pager.settledPage]
-        if (a.value < 1f) a.animateTo(1f, tween(1100, easing = LinearEasing))
+    // startet, sobald die Seite angesteuert wird (nicht erst nach dem Einrasten), und ist kurz
+    LaunchedEffect(pager.targetPage) {
+        val a = reveals[pager.targetPage]
+        if (a.value < 1f) a.animateTo(1f, tween(450, easing = LinearEasing))
     }
 
     CompositionLocalProvider(LocalPalette provides live) {

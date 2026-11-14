@@ -1,7 +1,7 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
-  "sha256": "09283ac8643fa7657bd3e90a3be6ab5c7e54e6326d1a8039b00f699fa529093c",
-  "notes": "Kürzere Texte und ein ruhiger Ladebildschirm.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-7.apk"
+  "versionCode": 8,
+  "versionName": "1.7",
+  "sha256": "759b95a6450025168fd41a15b69b68fa65f4e7d7821288abf934439cd5b6cee6",
+  "notes": "Animationen starten sofort und sind schneller.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-8.apk"
 }

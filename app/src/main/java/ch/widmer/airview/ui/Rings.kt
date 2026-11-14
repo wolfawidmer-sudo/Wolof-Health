@@ -123,7 +123,7 @@ fun RingsSection(days: List<RingDay>, goals: Goals, onGoals: (Goals) -> Unit) {
     // beim Tageswechsel neu aufziehen
     val swap = remember { Animatable(1f) }
     var first by remember { mutableStateOf(true) }
-    LaunchedEffect(sel) { if (first) first = false else { swap.snapTo(0f); swap.animateTo(1f, tween(700)) } }
+    LaunchedEffect(sel) { if (first) first = false else { swap.snapTo(0f); swap.animateTo(1f, tween(300)) } }
     val rings = ringsFor(day, goals)
     val allClosed = rings.all { it.value >= it.goal }
 

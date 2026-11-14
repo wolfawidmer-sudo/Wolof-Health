@@ -1,7 +1,7 @@
 # Wolof Health – Hinweise für Claude
 
 - Für jede Arbeit an Gestaltung, Layout, Texten in der App oder Animationen immer zuerst den
-  Skill **frontend-design** laden und befolgen (der Nutzer nennt ihn «frontend-design-studio»).
+  Skill **frontend-design-studio** laden und befolgen.
 - Gestaltung: kühles Blaugrau (Nacht-Indigo auf «Schlaf»), Schrift Archivo (schmal/fett für Zahlen),
   Farben kodieren Datentypen (Blau Bewegung, Rot Puls, Violett Schlaf, Bernstein Wachphasen/kcal).
   Keine KI-Klischees: kein Creme/Terrakotta, keine ALL-CAPS-Labels, keine Mono-Labels, keine Mittelpunkt-Trenner.
@@ -9,3 +9,4 @@
 - Nur echte Daten aus Health Connect; Standardquelle ist das Band (Google Health/Fitbit).
 - Neue Version veröffentlichen: `./release.sh "Was neu ist"` (Schlüssel siehe README, liegt in Google Drive).
 - Vor dem Veröffentlichen Screenshots mit `gradle testDebugUnitTest -Proborazzi.test.record=true` ansehen.
+- Animationen beim Betreten einer Seite: so kurz wie möglich (Reveal 450 ms, startet mit der Ziel-Seite).
