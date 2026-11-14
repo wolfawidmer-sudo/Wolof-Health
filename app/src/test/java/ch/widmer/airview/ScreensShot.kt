@@ -3,6 +3,7 @@ package ch.widmer.airview
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.health.connect.client.records.SleepSessionRecord as S
@@ -85,6 +86,14 @@ class ScreensShot {
     }
 
     @Test fun today() = shot("1_heute", 0)
+    @Test fun icon() {
+        rule.setContent {
+            androidx.compose.foundation.layout.Box(Modifier.size(androidx.compose.ui.unit.Dp(216f)).background(androidx.compose.ui.graphics.Color(0xFF171C22))) {
+                androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_fg), null, Modifier.fillMaxSize())
+            }
+        }
+        rule.onRoot().captureRoboImage("shots/8_icon.png")
+    }
     @Test fun skeleton() {
         rule.mainClock.autoAdvance = false
         rule.setContent { AirTheme { androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(LocalPalette.current.bg)) { Skeleton() } } }

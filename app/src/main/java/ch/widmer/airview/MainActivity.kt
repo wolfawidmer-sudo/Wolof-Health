@@ -155,11 +155,11 @@ fun App(vm: MainVm = viewModel()) {
             update = vm.update, updateVisible = !vm.updateDismissed,
             onInstall = vm::installUpdate, onDismissUpdate = { vm.updateDismissed = true }, onCheckUpdate = { vm.checkUpdate(manual = true) },
         )
+        UiState.Loading -> Box(Modifier.fillMaxSize().background(LocalPalette.current.bg).statusBarsPadding()) { Skeleton() }
         else -> {
             val p = LocalPalette.current
             Box(Modifier.fillMaxSize().background(p.bg).systemBarsPadding()) {
                 when (st) {
-                    UiState.Loading -> Skeleton()
                     UiState.NoHealthConnect -> Gate(
                         "Health Connect fehlt",
                         "Schalte in Google Health das Teilen mit Health Connect ein.",
@@ -431,43 +431,55 @@ private fun VersionLine(u: UpdateState, onCheck: () -> Unit) {
 }
 
 
-/** Platzhalter in der Form der Heute-Seite, solange Health Connect liest. */
+/**
+ * Platzhalter in exakt der Form der Heute-Seite (gleiche Seite, gleiche Masse wie
+ * TodayScreen), damit beim Laden nichts springt.
+ */
 @Composable
 internal fun Skeleton() {
     val p = LocalPalette.current
     val pulse = rememberInfiniteTransition(label = "skeleton")
     val a by pulse.animateFloat(.45f, 1f, infiniteRepeatable(tween(850, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "a")
     val c = p.track.copy(alpha = a)
-    @Composable fun bar(w: androidx.compose.ui.unit.Dp, h: androidx.compose.ui.unit.Dp, r: Int = 8) =
-        Box(Modifier.width(w).height(h).clip(RoundedCornerShape(r.dp)).background(c))
+    @Composable fun bar(w: androidx.compose.ui.unit.Dp, h: androidx.compose.ui.unit.Dp) =
+        Box(Modifier.width(w).height(h).clip(RoundedCornerShape(h / 2)).background(c))
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 12.dp)) {
-            bar(190.dp, 22.dp)
-            Spacer(Modifier.height(8.dp))
-            bar(130.dp, 14.dp, 6)
-            Spacer(Modifier.height(18.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                bar(200.dp, 96.dp, 14); Spacer(Modifier.width(12.dp)); bar(90.dp, 22.dp)
-            }
-            Spacer(Modifier.height(44.dp))
-            bar(80.dp, 20.dp)
-            Spacer(Modifier.height(18.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Canvas(Modifier.size(156.dp)) {
-                    val sw = 17.dp.toPx(); val gap = 5.dp.toPx()
+        Page { avail ->
+            val ring = (avail - 502.dp).coerceIn(150.dp, 280.dp)
+            Column { bar(230.dp, 24.dp); Spacer(Modifier.height(10.dp)); bar(160.dp, 14.dp) }
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Canvas(Modifier.size(ring)) {
+                    val sw = ring.toPx() * 0.085f; val gap = sw * 0.28f
                     for (i in 0..2) drawCircle(c, size.width / 2 - sw / 2 - i * (sw + gap), style = Stroke(sw))
                 }
-                Spacer(Modifier.width(22.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) { repeat(3) { bar(120.dp, 30.dp) } }
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth()) {
+                    repeat(3) {
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                            bar(56.dp, 12.dp); Spacer(Modifier.height(8.dp)); bar(72.dp, 24.dp); Spacer(Modifier.height(8.dp)); bar(64.dp, 12.dp)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    repeat(7) {
+                        Column(Modifier.padding(horizontal = 5.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Canvas(Modifier.size(32.dp)) { drawCircle(c, size.width / 2 - 2.dp.toPx(), style = Stroke(4.dp.toPx())) }
+                            Spacer(Modifier.height(6.dp)); bar(18.dp, 10.dp)
+                        }
+                    }
+                }
             }
-            Spacer(Modifier.height(24.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                repeat(7) { Box(Modifier.size(34.dp).clip(CircleShape).background(c)) }
+            Column {
+                bar(96.dp, 20.dp)
+                Spacer(Modifier.height(12.dp))
+                Box(Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(14.dp)).background(c))
             }
-            Spacer(Modifier.height(40.dp))
-            Box(Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(14.dp)).background(c))
+            Row(Modifier.fillMaxWidth()) {
+                repeat(3) { Column(Modifier.weight(1f)) { bar(54.dp, 28.dp); Spacer(Modifier.height(6.dp)); bar(64.dp, 12.dp) } }
+            }
         }
-        // Leiste unten, damit der Übergang zur echten Seite nicht springt
+        // Leiste unten an derselben Stelle wie die echte
         Box(
             Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)
                 .fillMaxWidth().height(68.dp).clip(RoundedCornerShape(26.dp)).background(p.bar),
