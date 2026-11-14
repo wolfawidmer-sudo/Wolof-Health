@@ -273,13 +273,21 @@ private fun Metric(label: String, data: List<DayValue>, unit: String, fmt: Strin
     Section(label)
     if (data.isEmpty()) { Note("Noch keine Werte."); return }
     val last = data.last().value
-    val avg = data.map { it.value }.average()
-    val delta = last - avg
+    // Vergleich mit den Tagen davor, nicht mit sich selbst – und erst ab ein paar Tagen
+    val before = data.dropLast(1)
+    val minDays = 3
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
             Big(fmt.format(last * reveal()), unit, 48)
-            val txt = if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "genau in deinem Schnitt"
+            val txt = if (before.size < minDays) {
+                val n = data.size
+                "Erst ${if (n == 1) "ein Tag" else "$n Tage"} gemessen. Den Vergleich mit deinem Schnitt gibt es ab ${minDays + 1} Tagen."
+            } else {
+                val avg = before.map { it.value }.average()
+                val delta = last - avg
+                if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "genau in deinem Schnitt von ${fmt.format(avg)}"
                 else "${fmt.format(abs(delta))} ${if (delta > 0) "über" else "unter"} deinem Schnitt von ${fmt.format(avg)}"
+            }
             Text(txt, style = Type.small, color = p.muted)
         }
         Spark(data, color, Modifier.width(120.dp).height(48.dp).padding(bottom = 6.dp))
