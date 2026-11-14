@@ -22,7 +22,7 @@ import kotlin.math.sin
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [34], qualifiers = "w411dp-h891dp-xxhdpi")
+@Config(sdk = [34], qualifiers = "w411dp-h914dp-xxhdpi")
 class ScreensShot {
     private val z = ZoneId.systemDefault()
     private val today = LocalDate.now(z)
@@ -97,5 +97,5 @@ class ScreensShot {
     @Test fun health() = shot("4_gesundheit", 3)
     @Test fun update() = shot("6_update", 0, update = UpdateState.Available(
         ch.widmer.airview.update.Release(5, "1.4", "", "", "Ringe zeigen jetzt auch die Woche im Detail.")))
-    @Test @Config(qualifiers = "w411dp-h891dp-night-xxhdpi") fun todayDark() = shot("5_heute_dunkel", 0)
+    @Test @Config(qualifiers = "w411dp-h914dp-night-xxhdpi") fun todayDark() = shot("5_heute_dunkel", 0)
 }

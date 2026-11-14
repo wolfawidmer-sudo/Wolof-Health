@@ -56,7 +56,7 @@ fun stagger(r: Float, i: Int, n: Int, spread: Float = .45f): Float {
  * Schlaf und Trainings. Mit dem Finger über die Kurve streichen zeigt den Puls zu jeder Uhrzeit.
  */
 @Composable
-fun DayStrip(day: LocalDate, hr: List<HrPoint>, sleep: List<SleepNight>, workouts: List<Workout>) {
+fun DayStrip(day: LocalDate, hr: List<HrPoint>, sleep: List<SleepNight>, workouts: List<Workout>, modifier: Modifier = Modifier.height(200.dp)) {
     val p = LocalPalette.current
     val r = reveal()
     val haptic = LocalHapticFeedback.current
@@ -78,7 +78,7 @@ fun DayStrip(day: LocalDate, hr: List<HrPoint>, sleep: List<SleepNight>, workout
     val pulse = rememberInfiniteTransition(label = "now")
     val ring by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearOutSlowInEasing)), label = "ring")
 
-    Column {
+    Column(modifier) {
         // Ablesezeile
         Row(Modifier.fillMaxWidth().height(28.dp), verticalAlignment = Alignment.CenterVertically) {
             if (scrubPoint != null) {
@@ -93,7 +93,7 @@ fun DayStrip(day: LocalDate, hr: List<HrPoint>, sleep: List<SleepNight>, workout
             }
         }
         Canvas(
-            Modifier.fillMaxWidth().height(150.dp).pointerInput(binned) {
+            Modifier.fillMaxWidth().weight(1f).pointerInput(binned) {
                 if (binned.isEmpty()) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -166,7 +166,7 @@ fun DayStrip(day: LocalDate, hr: List<HrPoint>, sleep: List<SleepNight>, workout
  */
 @Composable
 fun DayBars(
-    values: List<DayValue>, color: Color, goal: Double? = null, height: Int = 130,
+    values: List<DayValue>, color: Color, goal: Double? = null, modifier: Modifier = Modifier.height(190.dp),
     format: (Double) -> String = { "%,.0f".format(Locale.forLanguageTag("de-CH"), it) },
 ) {
     val p = LocalPalette.current
@@ -176,7 +176,7 @@ fun DayBars(
     var selected by remember(values) { mutableIntStateOf(values.lastIndex) }
     val max = maxOf(values.maxOf { it.value }, goal ?: 0.0, 1.0) * 1.05
     val sel = values[selected]
-    Column {
+    Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
             Text(
                 format(sel.value * r), style = Type.numeral.copy(fontSize = 30.sp()), color = p.ink,
@@ -188,7 +188,7 @@ fun DayBars(
             )
         }
         Canvas(
-            Modifier.fillMaxWidth().height(height.dp).pointerInput(values) {
+            Modifier.fillMaxWidth().weight(1f).pointerInput(values) {
                 detectTapGestures { o ->
                     val i = (o.x / (size.width / values.size)).toInt().coerceIn(0, values.lastIndex)
                     if (i != selected) { selected = i; haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
@@ -268,14 +268,14 @@ fun stageRow(stage: Int): Int = when (stage) {
 
 /** Hypnogramm, das sich von links nach rechts durch die Nacht aufbaut. Antippen zeigt die Phase. */
 @Composable
-fun Hypnogram(night: SleepNight, height: Int = 140) {
+fun Hypnogram(night: SleepNight, modifier: Modifier = Modifier.height(190.dp)) {
     val p = LocalPalette.current
     val r = reveal()
     val total = (night.end.epochSecond - night.start.epochSecond).toFloat().coerceAtLeast(1f)
     val labels = listOf("Wach", "REM", "Leicht", "Tief")
     val stages = remember(night) { night.stages.sortedBy { it.start } }
     var picked by remember(night) { mutableStateOf<ch.widmer.airview.data.SleepStage?>(null) }
-    Column {
+    Column(modifier) {
         if (picked != null) Row(Modifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically) {
             val st = picked
             if (st != null) {
@@ -287,12 +287,12 @@ fun Hypnogram(night: SleepNight, height: Int = 140) {
                 Unit
             }
         }
-        Row(Modifier.fillMaxWidth()) {
-            Column(Modifier.height(height.dp).width(54.dp), verticalArrangement = Arrangement.SpaceAround) {
+        Row(Modifier.fillMaxWidth().weight(1f)) {
+            Column(Modifier.fillMaxHeight().width(54.dp), verticalArrangement = Arrangement.SpaceAround) {
                 labels.forEach { Text(it, style = Type.small, color = p.muted) }
             }
             Canvas(
-                Modifier.weight(1f).height(height.dp).pointerInput(stages) {
+                Modifier.weight(1f).fillMaxHeight().pointerInput(stages) {
                     detectTapGestures { o ->
                         val t = night.start.epochSecond + (o.x / size.width * total).toLong()
                         picked = stages.firstOrNull { t in it.start.epochSecond until it.end.epochSecond }

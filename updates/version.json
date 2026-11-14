@@ -1,7 +1,7 @@
 {
-  "versionCode": 9,
-  "versionName": "1.8",
-  "sha256": "f12ee161767e3231cb27c149c433547edf20d06709b2bce321fda608288efb29",
-  "notes": "Kurze Quellenangabe, Gesundheit in Kacheln nach Herz und Atmung.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-9.apk"
+  "versionCode": 10,
+  "versionName": "1.9",
+  "sha256": "9543275baefee0d3e1106455c877bcc42f3b827f75f28ea4557ff2df8694aa25",
+  "notes": "Jede Seite passt genau über die Leiste, ohne Scrollen.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-10.apk"
 }

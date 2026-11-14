@@ -408,21 +408,20 @@ private fun UpdateBanner(u: UpdateState, onInstall: (Release) -> Unit, onDismiss
     }
 }
 
-/** Fusszeile auf der Gesundheitsseite: Version und manuelle Prüfung. */
+/** Version unten auf der Gesundheitsseite; antippen sucht nach Updates. */
 @Composable
 private fun VersionLine(u: UpdateState, onCheck: () -> Unit) {
     val p = LocalPalette.current
-    Spacer(Modifier.height(28.dp))
-    Text("Wolof Health ${BuildConfig.VERSION_NAME}", style = Type.small, color = p.muted)
+    val v = BuildConfig.VERSION_NAME
     Text(
         when (u) {
-            UpdateState.Checking -> "Suche nach Updates …"
-            UpdateState.UpToDate -> "Aktuell. Erneut prüfen"
-            is UpdateState.Available -> "Version ${u.r.versionName} ist verfügbar"
-            else -> "Nach Updates suchen"
+            UpdateState.Checking -> "Version $v, prüfe …"
+            UpdateState.UpToDate -> "Version $v, aktuell"
+            is UpdateState.Available -> "Version ${u.r.versionName} bereit"
+            else -> "Version $v"
         },
         style = Type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
-        color = p.ink, modifier = Modifier.clickable(onClick = onCheck).padding(vertical = 6.dp),
+        color = p.muted, modifier = Modifier.clickable(onClick = onCheck).padding(vertical = 6.dp),
     )
 }
 

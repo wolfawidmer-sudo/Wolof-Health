@@ -125,25 +125,15 @@ fun RingsSection(days: List<RingDay>, goals: Goals, onGoals: (Goals) -> Unit) {
     var first by remember { mutableStateOf(true) }
     LaunchedEffect(sel) { if (first) first = false else { swap.snapTo(0f); swap.animateTo(1f, tween(300)) } }
     val rings = ringsFor(day, goals)
-    val allClosed = rings.all { it.value >= it.goal }
 
-    Spacer(Modifier.height(36.dp))
-    Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
-        Text(if (day.date == LocalDate.now()) "Ringe" else "Ringe am " + day.date.dayOfWeek.getDisplayName(JTextStyle.FULL, Locale.GERMAN),
-            style = Type.title, color = p.ink, modifier = Modifier.weight(1f))
-        Text("Ziele", style = Type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), color = p.muted,
-            modifier = Modifier.clickable { editing = true })
-    }
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-            .combinedClickable(onClick = {}, onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); editing = true }),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.graphicsLayer { val s = .92f + .08f * r; scaleX = s; scaleY = s }) {
-            RingStack(day, goals, 156.dp, 17.dp, 5.dp, progress = minOf(r, swap.value))
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // Ringe antippen öffnet die Ziele
+        Box(Modifier.clip(CircleShape).clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); editing = true }
+            .graphicsLayer { val s = .92f + .08f * r; scaleX = s; scaleY = s }) {
+            RingStack(day, goals, 150.dp, 16.dp, 5.dp, progress = minOf(r, swap.value))
         }
         Spacer(Modifier.width(22.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             rings.forEach { ring ->
                 Column {
                     Text(ring.label, style = Type.small, color = ring.color)
@@ -155,9 +145,8 @@ fun RingsSection(days: List<RingDay>, goals: Goals, onGoals: (Goals) -> Unit) {
             }
         }
     }
-    if (allClosed) Text("Alle Ringe geschlossen", style = Type.small, color = p.ink, modifier = Modifier.padding(top = 10.dp))
-    Spacer(Modifier.height(18.dp))
-    // Woche
+    Spacer(Modifier.height(14.dp))
+    // Woche: antippen zeigt den Tag oben
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         days.forEachIndexed { i, d ->
             val chosen = i == sel
@@ -165,11 +154,11 @@ fun RingsSection(days: List<RingDay>, goals: Goals, onGoals: (Goals) -> Unit) {
                 Modifier.clip(RoundedCornerShape(12.dp))
                     .background(if (chosen) p.track.copy(alpha = .7f) else Color.Transparent)
                     .clickable { sel = i; haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-                    .padding(horizontal = 5.dp, vertical = 6.dp),
+                    .padding(horizontal = 5.dp, vertical = 5.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                RingStack(d, goals, 34.dp, 4.dp, 1.5.dp, progress = stagger(r, i, days.size, .5f), detailed = false)
-                Spacer(Modifier.height(4.dp))
+                RingStack(d, goals, 32.dp, 4.dp, 1.5.dp, progress = stagger(r, i, days.size, .5f), detailed = false)
+                Spacer(Modifier.height(3.dp))
                 Text(
                     d.date.dayOfWeek.getDisplayName(JTextStyle.SHORT, Locale.GERMAN).take(2),
                     style = Type.small, color = if (chosen) p.ink else p.muted, textAlign = TextAlign.Center,
