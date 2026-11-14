@@ -1,0 +1,7 @@
+{
+  "versionCode": 4,
+  "versionName": "1.3",
+  "sha256": "4ca12521a559a965d3147bb25dee6bf266c8b6a787c76904eac92757de734359",
+  "notes": "Erste Version mit Update-System",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-4.apk"
+}
