@@ -9,5 +9,5 @@
 - Nur echte Daten aus Health Connect; Standardquelle ist das Band (Google Health/Fitbit).
 - Neue Version veröffentlichen: `./release.sh "Was neu ist"` (Schlüssel siehe README, liegt in Google Drive).
 - Vor dem Veröffentlichen Screenshots mit `gradle testDebugUnitTest -Proborazzi.test.record=true` ansehen.
-- Animationen beim Betreten einer Seite: so kurz wie möglich (Reveal 450 ms, startet mit der Ziel-Seite).
+- Animationen beim Betreten einer Seite: so kurz wie möglich (Reveal 1100 ms bei jedem Besuch, startet sofort mit der Ziel-Seite).
 - Seitenaufbau: jede Seite passt genau über die Taskleiste. Ein Hauptelement pro Seite skaliert (Ringe, Schrittwoche, Hypnogramm), alles andere natürliche Grösse; Restplatz = gleichmässige Abstände zwischen Gruppen. Nie Diagramme verzerren.

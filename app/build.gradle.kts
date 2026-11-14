@@ -14,8 +14,8 @@ android {
         applicationId = "ch.widmer.airview"
         minSdk = 28
         targetSdk = 35
-        versionCode = 11
-        versionName = "1.10"
+        versionCode = 12
+        versionName = "1.11"
         buildConfigField("String", "UPDATE_URL", "\"https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/version.json\"")
     }
     // Fester Release-Schlüssel – liegt NICHT im Repo (siehe README). Ohne ihn baut kein Release.

@@ -1,7 +1,7 @@
 {
-  "versionCode": 11,
-  "versionName": "1.10",
-  "sha256": "dd2374148661e3eb330d5df0abf51161b2ea914a6e3b780184671c35cc0f962f",
-  "notes": "Neu aufgeteilte Seiten: ein Hauptelement pro Seite, nichts mehr gestreckt.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-11.apk"
+  "versionCode": 12,
+  "versionName": "1.11",
+  "sha256": "9afa418baee2010c5e323b097de21d3f48fa7164785ed4f336eeedd1124dc52e",
+  "notes": "Ringe über 100 % ohne Naht, deutlichere Animationen bei jedem Seitenwechsel.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-12.apk"
 }

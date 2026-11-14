@@ -66,7 +66,7 @@ class ScreensShot {
                 RingDay(today.minusDays(6), 11_204, 610.0, 52), RingDay(today.minusDays(5), 6_310, 280.0, 12),
                 RingDay(today.minusDays(4), 9_870, 540.0, 41), RingDay(today.minusDays(3), 12_455, 720.0, 66),
                 RingDay(today.minusDays(2), 4_120, 190.0, 8), RingDay(today.minusDays(1), 10_380, 505.0, 31),
-                RingDay(today, 7_842, 412.0, 47),
+                RingDay(today, 7_057, 315.0, 53),
             ),
             sources = listOf(Source("com.fitbit.FitbitMobile", "Google Health", today.minusDays(1), 2),
                 Source("com.android.healthconnect.phone.x", "Handy", today.minusDays(29), 30)),
@@ -92,6 +92,7 @@ class ScreensShot {
         rule.onRoot().captureRoboImage("shots/7_laden.png")
     }
     @Test fun todayMid() = shot("0_heute_animation", 0, 450)
+    @Test fun todayMid2() = shot("0_heute_animation2", 0, 800)
     @Test fun fitness() = shot("2_fitness", 1)
     @Test fun sleep() = shot("3_schlaf", 2)
     @Test fun health() = shot("4_gesundheit", 3)

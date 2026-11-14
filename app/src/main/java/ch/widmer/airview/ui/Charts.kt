@@ -172,6 +172,7 @@ fun DayBars(
     val p = LocalPalette.current
     if (values.isEmpty()) return
     val r = reveal()
+    val raw = LocalReveal.current
     val haptic = LocalHapticFeedback.current
     var selected by remember(values) { mutableIntStateOf(values.lastIndex) }
     val max = maxOf(values.maxOf { it.value }, goal ?: 0.0, 1.0) * 1.05
@@ -199,7 +200,7 @@ fun DayBars(
             val slot = size.width / n
             val bw = slot * if (n > 10) 0.55f else 0.38f
             values.forEachIndexed { i, v ->
-                val grow = FastOutSlowInEasing.transform(stagger(r, i, n))
+                val grow = FastOutSlowInEasing.transform(stagger(raw, i, n, .55f))
                 val h = (v.value / max * size.height).toFloat() * grow
                 val x = i * slot + (slot - bw) / 2
                 drawRoundRect(p.track, Offset(x, 0f), Size(bw, size.height), CornerRadius(bw / 2))

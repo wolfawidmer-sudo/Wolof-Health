@@ -74,7 +74,7 @@ fun RingStack(day: RingDay, goals: Goals, size: Dp, stroke: Dp, gap: Dp = 3.dp, 
         val sw = stroke.toPx()
         rings.forEachIndexed { i, r ->
             val inset = sw / 2 + i * (sw + gap.toPx())
-            val frac = (r.value / r.goal).toFloat() * FastOutSlowInEasing.transform(stagger(progress, i, 3, .25f))
+            val frac = (r.value / r.goal).toFloat() * FastOutSlowInEasing.transform(stagger(progress, i, 3, .35f))
             ring(inset, sw, frac, r.color, p.ink, p.bg, detailed)
         }
     }
@@ -96,16 +96,22 @@ private fun DrawScope.ring(inset: Float, sw: Float, frac: Float, c: Color, ink: 
         drawArc(c, -90f, 360f * frac, false, tl, sz, style = Stroke(sw, cap = StrokeCap.Round))
         return
     }
-    // Ziel erreicht: erste Runde als geschlossener Kreis (keine Kappen, die sich überlagern)
+    // Ziel erreicht: erste Runde als geschlossener Kreis
     drawCircle(c, r, center, style = Stroke(sw))
     val extra = frac - 1f
     if (!detailed || extra < 0.004f) return
-    // zweite Runde: dunkler, flacher Anfang, runde Spitze
-    val lap = extra.coerceAtMost(.995f)
-    val dark = lerp(c, ink, .22f)
-    drawArc(dark, -90f, 360f * lap, false, tl, sz, style = Stroke(sw, cap = StrokeCap.Butt))
+    // Zweite Runde in derselben Farbe – keine Naht. Die Spitze wirft einen weichen
+    // Schatten nach vorn, so sieht man, dass der Ring über sich selbst läuft.
+    val lap = extra.coerceAtMost(.98f)
     val tip = at(lap)
-    drawCircle(dark, sw / 2, tip)
+    val ahead = at(lap + 0.012f)
+    val dir = Offset(ahead.x - tip.x, ahead.y - tip.y).let { val l = it.getDistance().coerceAtLeast(.001f); Offset(it.x / l, it.y / l) }
+    for (k in 5 downTo 1) {
+        val spread = sw * (0.08f * k)
+        drawCircle(Color.Black.copy(alpha = .07f), sw / 2 + spread * .5f, tip + dir * (sw * .18f + spread * .4f))
+    }
+    drawArc(c, -90f, 360f * lap, false, tl, sz, style = Stroke(sw, cap = StrokeCap.Butt))
+    drawCircle(c, sw / 2, tip)
 }
 
 /** Ringe-Abschnitt für «Heute»: grosse Ringe, Werte daneben, darunter die Woche zum Antippen. */
@@ -129,9 +135,9 @@ fun RingsSection(days: List<RingDay>, goals: Goals, ringSize: Dp, onGoals: (Goal
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         // Ringe antippen öffnet die Ziele
         Box(Modifier.clip(CircleShape).clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); editing = true }
-            .graphicsLayer { val s = .92f + .08f * r; scaleX = s; scaleY = s }) {
+            .graphicsLayer { val s = .78f + .22f * r; scaleX = s; scaleY = s; alpha = (r * 1.6f).coerceAtMost(1f); rotationZ = -40f * (1f - r) }) {
             val stroke = ringSize * 0.085f
-            RingStack(day, goals, ringSize, stroke, stroke * 0.28f, progress = minOf(r, swap.value))
+            RingStack(day, goals, ringSize, stroke, stroke * 0.28f, progress = minOf(LocalReveal.current, swap.value))
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth()) {
