@@ -325,11 +325,20 @@ fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
                 ?: "Noch keine Nacht",
             style = Type.numeral.copy(fontSize = 40.sp, lineHeight = 44.sp), color = p.ink,
         )
-        MetricRow("Ruhepuls", s.restingHr, "bpm", "%.0f", p.heart)
-        MetricRow("HRV", s.hrv, "ms", "%.0f", p.heart)
-        MetricRow("Sauerstoff", s.spo2, "%", "%.1f", p.sleep)
-        MetricRow("Atemfrequenz", s.respRate, "/min", "%.1f", p.sleep)
-        s.weightKg?.let { MetricRow("Gewicht", listOf(DayValue(LocalDate.now(), it)), "kg", "%.1f", p.move, trend = false) }
+        // nur Werte zeigen, die das Band wirklich liefert
+        val rows = buildList {
+            if (s.restingHr.isNotEmpty()) add(Triple("Ruhepuls", s.restingHr, Triple("bpm", "%.0f", p.heart)))
+            if (s.hrv.isNotEmpty()) add(Triple("HRV", s.hrv, Triple("ms", "%.0f", p.heart)))
+            if (s.spo2.isNotEmpty()) add(Triple("Sauerstoff", s.spo2, Triple("%", "%.1f", p.sleep)))
+            if (s.respRate.isNotEmpty()) add(Triple("Atemfrequenz", s.respRate, Triple("/min", "%.1f", p.sleep)))
+            s.weightKg?.let { add(Triple("Gewicht", listOf(DayValue(LocalDate.now(), it)), Triple("kg", "%.1f", p.move))) }
+        }
+        Column(Modifier.fillMaxWidth().weight(1f).padding(vertical = 16.dp)) {
+            if (rows.isEmpty()) Note("Trag das Band in der Nacht, dann erscheinen hier deine Werte.")
+            rows.forEach { (label, data, f) ->
+                MetricRow(label, data, f.first, f.second, f.third, trend = label != "Gewicht", modifier = Modifier.weight(1f))
+            }
+        }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Keine Diagnose", style = Type.small, color = p.muted, modifier = Modifier.weight(1f))
             footer()
@@ -342,21 +351,24 @@ fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
  * zeigen vier Punkte, wie weit dein persönlicher Schnitt aufgebaut ist.
  */
 @Composable
-private fun MetricRow(label: String, data: List<DayValue>, unit: String, fmt: String, color: Color, trend: Boolean = true) {
+private fun MetricRow(label: String, data: List<DayValue>, unit: String, fmt: String, color: Color, trend: Boolean = true, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val need = 4
-    Column(Modifier.fillMaxWidth()) {
+    Column(modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(p.track))
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        // Inhalt mittig zwischen den Trennlinien
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+        // Zahl wächst mit der Zeilenhöhe: wenige Werte = grössere Zahlen statt Leerraum
+        val num = (maxHeight.value * 0.34f).coerceIn(44f, 88f).toInt()
+        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Canvas(Modifier.size(8.dp)) { drawCircle(color) }
                     Spacer(Modifier.width(8.dp))
                     Text(label, style = Type.small, color = p.ink)
                 }
-                if (data.isEmpty()) Text("–", style = Type.numeral.copy(fontSize = 44.sp, lineHeight = 48.sp), color = p.muted)
-                else Big(fmt.format(data.last().value * reveal()), unit, 44)
+                if (data.isEmpty()) Text("–", style = Type.numeral.copy(fontSize = num.sp, lineHeight = (num * 1.05).sp), color = p.muted)
+                else Big(fmt.format(data.last().value * reveal()), unit, num)
             }
             Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(132.dp).padding(bottom = 6.dp)) {
                 when {
@@ -367,7 +379,7 @@ private fun MetricRow(label: String, data: List<DayValue>, unit: String, fmt: St
                             repeat(need) { i -> Canvas(Modifier.size(7.dp)) { drawCircle(if (i < data.size) color else p.track) } }
                         }
                         Spacer(Modifier.height(6.dp))
-                        Text("Basis ${data.size}/$need", style = Type.small, color = p.muted)
+                        Text("Verlauf ab $need Nächten", style = Type.small, color = p.muted)
                     }
                     else -> {
                         val before = data.dropLast(1).map { it.value }.average()
@@ -384,4 +396,5 @@ private fun MetricRow(label: String, data: List<DayValue>, unit: String, fmt: St
             }
         }
     }
+        }
 }

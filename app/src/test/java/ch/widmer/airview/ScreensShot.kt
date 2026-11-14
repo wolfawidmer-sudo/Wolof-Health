@@ -61,7 +61,7 @@ class ScreensShot {
                 Workout("Laufen", 56, at(today.minusDays(2), 18, 10), at(today.minusDays(2), 18, 58), 512.0, 8_210.0, 151),
                 Workout("Velo", 8, at(today.minusDays(4), 7, 30), at(today.minusDays(4), 8, 5), 290.0, 11_400.0, 128),
             ),
-            sleep = nights, restingHr = series(30, 56.0, 2.5), hrv = series(1, 89.0, 0.0),
+            sleep = nights, restingHr = series(1, 56.0, 0.0), hrv = series(1, 89.0, 0.0),
             rings = listOf(
                 RingDay(today.minusDays(6), 11_204, 610.0, 52), RingDay(today.minusDays(5), 6_310, 280.0, 12),
                 RingDay(today.minusDays(4), 9_870, 540.0, 41), RingDay(today.minusDays(3), 12_455, 720.0, 66),
@@ -71,7 +71,7 @@ class ScreensShot {
             sources = listOf(Source("com.fitbit.FitbitMobile", "Google Health", today.minusDays(1), 2),
                 Source("com.android.healthconnect.phone.x", "Handy", today.minusDays(29), 30)),
             activeSources = setOf("com.fitbit.FitbitMobile", "com.android.healthconnect.phone.x"),
-            spo2 = emptyList(), respRate = series(30, 14.6, 0.5), vo2max = 46.0, weightKg = 74.3,
+            spo2 = emptyList(), respRate = series(1, 17.8, 0.0), vo2max = 46.0,
         )
     }
 

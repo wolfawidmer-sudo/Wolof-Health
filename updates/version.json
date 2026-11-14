@@ -1,7 +1,7 @@
 {
-  "versionCode": 13,
-  "versionName": "1.12",
-  "sha256": "92317bd2763e3d898292f5f4db4491158741587b40cae2a0dd0ed26af0cc7ef6",
-  "notes": "Neues App-Icon.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-13.apk"
+  "versionCode": 14,
+  "versionName": "1.13",
+  "sha256": "37ba70ed1d932097d73b9614e1aa080cae59d2361543b0b4046a8e19ee71ff40",
+  "notes": "App-Icon als Vektorgrafik, Gesundheit verständlicher und ohne leere Werte.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-14.apk"
 }
