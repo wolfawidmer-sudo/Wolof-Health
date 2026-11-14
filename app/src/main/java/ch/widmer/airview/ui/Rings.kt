@@ -127,7 +127,13 @@ fun RingsSection(days: List<RingDay>, goals: Goals, onGoals: (Goals) -> Unit) {
     val rings = ringsFor(day, goals)
     val allClosed = rings.all { it.value >= it.goal }
 
-    Section("Ringe", if (day.date == LocalDate.now()) "heute" else day.date.dayOfWeek.getDisplayName(JTextStyle.FULL, Locale.GERMAN))
+    Spacer(Modifier.height(36.dp))
+    Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
+        Text(if (day.date == LocalDate.now()) "Ringe" else "Ringe am " + day.date.dayOfWeek.getDisplayName(JTextStyle.FULL, Locale.GERMAN),
+            style = Type.title, color = p.ink, modifier = Modifier.weight(1f))
+        Text("Ziele", style = Type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline), color = p.muted,
+            modifier = Modifier.clickable { editing = true })
+    }
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
             .combinedClickable(onClick = {}, onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); editing = true }),
@@ -149,14 +155,7 @@ fun RingsSection(days: List<RingDay>, goals: Goals, onGoals: (Goals) -> Unit) {
             }
         }
     }
-    Spacer(Modifier.height(10.dp))
-    Text(
-        when {
-            allClosed -> "Alle drei Ringe geschlossen."
-            else -> "Lange drücken, um die Ziele zu ändern."
-        },
-        style = Type.small, color = if (allClosed) p.ink else p.muted,
-    )
+    if (allClosed) Text("Alle Ringe geschlossen", style = Type.small, color = p.ink, modifier = Modifier.padding(top = 10.dp))
     Spacer(Modifier.height(18.dp))
     // Woche
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -203,7 +202,7 @@ private fun GoalsDialog(start: Goals, onDismiss: () -> Unit, onSave: (Goals) -> 
                 Stepper("Trainieren", "${g.exerciseMin} min", p.heart,
                     { g = g.copy(exerciseMin = (g.exerciseMin - 5).coerceAtLeast(5)) },
                     { g = g.copy(exerciseMin = (g.exerciseMin + 5).coerceAtMost(180)) })
-                Text("Als Trainingsminute zählt jede Minute mit mindestens 100 Schritten oder in einem aufgezeichneten Training.", style = Type.small, color = p.muted)
+                Text("Trainingsminute: ab 100 Schritten pro Minute oder während eines Trainings.", style = Type.small, color = p.muted)
             }
         },
         confirmButton = { TextButton({ onSave(g) }) { Text("Ziele speichern", style = Type.title.copy(fontSize = 15.sp), color = p.ink) } },

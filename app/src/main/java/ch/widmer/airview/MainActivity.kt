@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -158,19 +159,17 @@ fun App(vm: MainVm = viewModel()) {
             val p = LocalPalette.current
             Box(Modifier.fillMaxSize().background(p.bg).systemBarsPadding()) {
                 when (st) {
-                    UiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Daten werden geladen", style = Type.body, color = p.muted)
-                    }
+                    UiState.Loading -> Skeleton()
                     UiState.NoHealthConnect -> Gate(
                         "Health Connect fehlt",
-                        "Diese App liest die Daten, die Google Health in Health Connect ablegt. Installiere oder aktiviere Health Connect und schalte in Google Health das Teilen mit Health Connect ein.",
+                        "Schalte in Google Health das Teilen mit Health Connect ein.",
                         "Health Connect installieren",
                     ) {
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.apps.healthdata")))
                     }
                     UiState.NeedsPermission -> Gate(
                         "Zugriff erlauben",
-                        "Erlaube das Lesen von Schritten, Puls, Schlaf und den übrigen Werten. Die Daten bleiben auf dem Telefon. Ins Internet geht die App nur für die Suche nach Updates.",
+                        "Die Daten bleiben auf dem Telefon.",
                         "Zugriff erlauben",
                     ) { launcher.launch(PERMISSIONS) }
                     is UiState.Error -> Gate("Daten konnten nicht geladen werden", st.msg, "Erneut versuchen") { vm.refresh() }
@@ -237,7 +236,7 @@ fun Pages(
                         ) {
                             if (data.missing.isNotEmpty() && page == 0) {
                                 Text(
-                                    "${data.missing.size} Datentypen sind nicht freigegeben. Zugriff ändern",
+                                    "${data.missing.size} Datentypen gesperrt. Freigeben",
                                     style = Type.small, color = LocalPalette.current.heart,
                                     modifier = Modifier.fillMaxWidth().clickable(onClick = onPermissions)
                                         .padding(horizontal = 24.dp, vertical = 10.dp),
@@ -417,11 +416,56 @@ private fun VersionLine(u: UpdateState, onCheck: () -> Unit) {
     Text(
         when (u) {
             UpdateState.Checking -> "Suche nach Updates …"
-            UpdateState.UpToDate -> "Du hast die neueste Version. Erneut prüfen"
+            UpdateState.UpToDate -> "Aktuell. Erneut prüfen"
             is UpdateState.Available -> "Version ${u.r.versionName} ist verfügbar"
             else -> "Nach Updates suchen"
         },
         style = Type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
         color = p.ink, modifier = Modifier.clickable(onClick = onCheck).padding(vertical = 6.dp),
     )
+}
+
+
+/** Platzhalter in der Form der Heute-Seite, solange Health Connect liest. */
+@Composable
+internal fun Skeleton() {
+    val p = LocalPalette.current
+    val pulse = rememberInfiniteTransition(label = "skeleton")
+    val a by pulse.animateFloat(.45f, 1f, infiniteRepeatable(tween(850, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "a")
+    val c = p.track.copy(alpha = a)
+    @Composable fun bar(w: androidx.compose.ui.unit.Dp, h: androidx.compose.ui.unit.Dp, r: Int = 8) =
+        Box(Modifier.width(w).height(h).clip(RoundedCornerShape(r.dp)).background(c))
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 12.dp)) {
+            bar(190.dp, 22.dp)
+            Spacer(Modifier.height(8.dp))
+            bar(130.dp, 14.dp, 6)
+            Spacer(Modifier.height(18.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                bar(200.dp, 96.dp, 14); Spacer(Modifier.width(12.dp)); bar(90.dp, 22.dp)
+            }
+            Spacer(Modifier.height(44.dp))
+            bar(80.dp, 20.dp)
+            Spacer(Modifier.height(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Canvas(Modifier.size(156.dp)) {
+                    val sw = 17.dp.toPx(); val gap = 5.dp.toPx()
+                    for (i in 0..2) drawCircle(c, size.width / 2 - sw / 2 - i * (sw + gap), style = Stroke(sw))
+                }
+                Spacer(Modifier.width(22.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) { repeat(3) { bar(120.dp, 30.dp) } }
+            }
+            Spacer(Modifier.height(24.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                repeat(7) { Box(Modifier.size(34.dp).clip(CircleShape).background(c)) }
+            }
+            Spacer(Modifier.height(40.dp))
+            Box(Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(14.dp)).background(c))
+        }
+        // Leiste unten, damit der Übergang zur echten Seite nicht springt
+        Box(
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)
+                .fillMaxWidth().height(68.dp).clip(RoundedCornerShape(26.dp)).background(p.bar),
+        )
+    }
 }

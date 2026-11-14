@@ -103,7 +103,6 @@ class HealthRepo(private val context: Context) {
             } while (!token.isNullOrEmpty())
         }
         scan(StepsRecord::class) { it.startTime }
-        scan(HeartRateRecord::class) { it.startTime }
         scan(SleepSessionRecord::class) { it.endTime }
         scan(ActiveCaloriesBurnedRecord::class) { it.startTime }
         val pm = context.packageManager

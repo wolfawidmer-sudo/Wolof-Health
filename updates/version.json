@@ -1,7 +1,7 @@
 {
-  "versionCode": 6,
-  "versionName": "1.5",
-  "sha256": "f7a08fababf9f4e3d88ffbac8bd8b32cfc52eafe2b4ac3b3b7c981615e71c92a",
-  "notes": "Standardmässig nur noch Daten deines Bands. Oben auf «Heute» siehst und änderst du die Datenquellen.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-6.apk"
+  "versionCode": 7,
+  "versionName": "1.6",
+  "sha256": "09283ac8643fa7657bd3e90a3be6ab5c7e54e6326d1a8039b00f699fa529093c",
+  "notes": "Kürzere Texte und ein ruhiger Ladebildschirm.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-7.apk"
 }

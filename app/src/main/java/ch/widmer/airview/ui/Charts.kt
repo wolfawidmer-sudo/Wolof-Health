@@ -87,7 +87,7 @@ fun DayStrip(day: LocalDate, hr: List<HrPoint>, sleep: List<SleepNight>, workout
                 Text("${scrubPoint.second.toInt()} bpm", style = Type.title.copy(fontSize = 16.sp()), color = p.heart)
             } else {
                 Text(
-                    if (binned.isEmpty()) "Heute noch keine Pulswerte" else "Über die Kurve streichen, um den Puls abzulesen",
+                    if (binned.isEmpty()) "Noch kein Puls heute" else "jetzt ${binned.last().second.toInt()} bpm",
                     style = Type.small, color = p.muted,
                 )
             }
@@ -276,7 +276,7 @@ fun Hypnogram(night: SleepNight, height: Int = 140) {
     val stages = remember(night) { night.stages.sortedBy { it.start } }
     var picked by remember(night) { mutableStateOf<ch.widmer.airview.data.SleepStage?>(null) }
     Column {
-        Row(Modifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (picked != null) Row(Modifier.fillMaxWidth().height(26.dp), verticalAlignment = Alignment.CenterVertically) {
             val st = picked
             if (st != null) {
                 Text(labels[stageRow(st.stage)], style = Type.title.copy(fontSize = 16.sp()), color = p.ink)
@@ -284,7 +284,7 @@ fun Hypnogram(night: SleepNight, height: Int = 140) {
                 Text("${hhmm(st.start)} bis ${hhmm(st.end)}, ${java.time.Duration.between(st.start, st.end).toMinutes()} min",
                     style = Type.small, color = p.muted)
             } else if (stages.isNotEmpty()) {
-                Text("Phase antippen für Details", style = Type.small, color = p.muted)
+                Unit
             }
         }
         Row(Modifier.fillMaxWidth()) {

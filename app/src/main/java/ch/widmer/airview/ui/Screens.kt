@@ -88,7 +88,7 @@ fun SourceLine(s: Snapshot) {
     var open by remember { mutableStateOf(false) }
     val active = s.sources.filter { s.activeSources.isEmpty() || it.pkg in s.activeSources }
     val label = when {
-        s.sources.isEmpty() -> "Noch keine Datenquellen gefunden"
+        s.sources.isEmpty() -> "Keine Datenquellen"
         s.activeSources.isEmpty() -> "Daten aus allen Apps"
         active.isEmpty() -> "Keine Quelle gewählt"
         else -> "Daten von " + active.joinToString(" und ") { it.label }
@@ -105,7 +105,7 @@ fun SourceLine(s: Snapshot) {
             title = { Text("Datenquellen", style = Type.title) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Diese Apps haben in den letzten 30 Tagen Daten in Health Connect geschrieben. Gezählt wird nur, was angehakt ist.",
+                    Text("Gezählt wird nur, was angehakt ist.",
                         style = Type.small, color = p.muted)
                     s.sources.forEach { src ->
                         val on = src.pkg in pick
@@ -160,7 +160,7 @@ fun TodayScreen(s: Snapshot) {
 
         RingsSection(s.rings, goals) { goals = it }
 
-        Section("Dein Tag", s.hrToday.lastOrNull()?.let { "zuletzt ${it.bpm} bpm um ${hhmm(it.time)}" })
+        Section("Dein Tag")
         DayStrip(today, s.hrToday, s.sleep, s.workouts)
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -208,13 +208,11 @@ fun FitnessScreen(s: Snapshot) {
     val STEP_GOAL = GoalStore.load(androidx.compose.ui.platform.LocalContext.current).steps.toDouble()
     Page {
         val avg = s.stepsWeek.map { it.value }.average()
-        Section("Schritte der letzten 7 Tage", if (!avg.isNaN()) "Schnitt ${avg.grouped()}" else null)
-        if (s.stepsWeek.isNotEmpty()) DayBars(s.stepsWeek, p.move, STEP_GOAL) else Note("Noch keine Schritte erfasst.")
-        Text("Gestrichelt: Ziel von ${STEP_GOAL.grouped()} Schritten", style = Type.small, color = p.muted,
-            modifier = Modifier.padding(top = 8.dp))
+        Section("Schritte, 7 Tage", if (!avg.isNaN()) "Schnitt ${avg.grouped()}" else null)
+        if (s.stepsWeek.isNotEmpty()) DayBars(s.stepsWeek, p.move, STEP_GOAL) else Note("Noch keine Schritte.")
 
         if (s.kcalWeek.any { it.value > 0 }) {
-            Section("Kalorienverbrauch", "kcal pro Tag, inkl. Grundumsatz")
+            Section("Kalorien", "kcal gesamt")
             DayBars(s.kcalWeek, p.move, height = 90)
         }
 
@@ -223,7 +221,7 @@ fun FitnessScreen(s: Snapshot) {
             Big("%.0f".format(it * reveal()), "VO₂max, ml/kg/min", 56)
         }
 
-        Section("Trainings", "letzte 30 Tage")
+        Section("Trainings", "30 Tage")
         if (s.workouts.isEmpty()) Note("Keine Trainings in den letzten 30 Tagen. Das Fitbit Air erkennt Gehen, Laufen und Velofahren automatisch; andere Trainings startest du in Google Health.")
         s.workouts.forEach { w ->
             Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
@@ -257,14 +255,14 @@ fun SleepScreen(s: Snapshot) {
     Page {
         if (n == null) {
             Section("Schlaf")
-            Note("Noch keine Nacht erfasst. Trag das Fitbit Air nachts, dann erscheint hier deine Schlafkurve.")
+            Note("Noch keine Nacht erfasst.")
             return@Page
         }
         Text("Nacht auf ${n.date.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE))}", style = Type.title, color = p.muted)
         Spacer(Modifier.height(8.dp))
         Big(dur((n.asleepMinutes * reveal()).toLong()), "h geschlafen", 96, color = p.ink)
         val inBed = Duration.between(n.start, n.end).toMinutes()
-        Text("${dur(inBed)} h im Bett, davon ${n.asleepMinutes * 100 / inBed.coerceAtLeast(1)} % geschlafen",
+        Text("${n.asleepMinutes * 100 / inBed.coerceAtLeast(1)} % von ${dur(inBed)} h im Bett",
             style = Type.body, color = p.muted)
 
         Section("Schlafphasen")
@@ -272,13 +270,12 @@ fun SleepScreen(s: Snapshot) {
         if (n.stages.isNotEmpty()) {
             Spacer(Modifier.height(20.dp))
             StageRows(n)
-        } else Note("Für diese Nacht liegen keine Phasen vor, nur Beginn und Ende.")
+        } else Note("Keine Schlafphasen erfasst.")
 
         if (s.sleep.size > 1) {
             Section("Schlafdauer", "Schnitt ${dur(s.sleep.map { it.asleepMinutes }.average().toLong())} h")
             DayBars(s.sleep.takeLast(14).map { DayValue(it.date, it.asleepMinutes / 60.0) }, p.sleep, goal = 8.0, height = 110,
                 format = { "${dur((it * 60).toLong())} h" })
-            Text("Gestrichelt: 8 Stunden", style = Type.small, color = p.muted, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
@@ -309,8 +306,6 @@ private fun StageRows(n: SleepNight) {
 fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
     val p = LocalPalette.current
     Page {
-        Text("Nächtliche Messwerte der letzten 30 Tage, verglichen mit deinem eigenen Schnitt.",
-            style = Type.body, color = p.muted, modifier = Modifier.padding(top = 4.dp))
         Metric("Ruhepuls", s.restingHr, "bpm", "%.0f", p.heart)
         Metric("Herzfrequenzvariabilität", s.hrv, "ms", "%.0f", p.heart)
         Metric("Sauerstoffsättigung", s.spo2, "%", "%.1f", p.sleep)
@@ -320,7 +315,7 @@ fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
             Big("%.1f".format(it * reveal()), "kg", 48)
         }
         Spacer(Modifier.height(28.dp))
-        Text("Diese Werte sind keine medizinische Diagnose. Bei auffälligen oder anhaltenden Abweichungen sprich mit deiner Ärztin oder deinem Arzt.",
+        Text("Keine medizinische Diagnose.",
             style = Type.small, color = p.muted)
         footer()
     }
@@ -340,12 +335,12 @@ private fun Metric(label: String, data: List<DayValue>, unit: String, fmt: Strin
             Big(fmt.format(last * reveal()), unit, 48)
             val txt = if (before.size < minDays) {
                 val n = data.size
-                "Erst ${if (n == 1) "ein Tag" else "$n Tage"} gemessen. Den Vergleich mit deinem Schnitt gibt es ab ${minDays + 1} Tagen."
+                "Vergleich ab ${minDays + 1} Messtagen ($n bisher)"
             } else {
                 val avg = before.map { it.value }.average()
                 val delta = last - avg
-                if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "genau in deinem Schnitt von ${fmt.format(avg)}"
-                else "${fmt.format(abs(delta))} ${if (delta > 0) "über" else "unter"} deinem Schnitt von ${fmt.format(avg)}"
+                if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "wie dein Schnitt"
+                else "${if (delta > 0) "+" else "−"}${fmt.format(abs(delta))} zum Schnitt (${fmt.format(avg)})"
             }
             Text(txt, style = Type.small, color = p.muted)
         }

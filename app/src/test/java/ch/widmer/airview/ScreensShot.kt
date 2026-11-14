@@ -82,6 +82,12 @@ class ScreensShot {
     }
 
     @Test fun today() = shot("1_heute", 0)
+    @Test fun skeleton() {
+        rule.mainClock.autoAdvance = false
+        rule.setContent { AirTheme { androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().background(LocalPalette.current.bg)) { Skeleton() } } }
+        rule.mainClock.advanceTimeBy(400)
+        rule.onRoot().captureRoboImage("shots/7_laden.png")
+    }
     @Test fun todayMid() = shot("0_heute_animation", 0, 450)
     @Test fun fitness() = shot("2_fitness", 1)
     @Test fun sleep() = shot("3_schlaf", 2)
