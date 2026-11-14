@@ -1,7 +1,7 @@
 {
-  "versionCode": 8,
-  "versionName": "1.7",
-  "sha256": "759b95a6450025168fd41a15b69b68fa65f4e7d7821288abf934439cd5b6cee6",
-  "notes": "Animationen starten sofort und sind schneller.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-8.apk"
+  "versionCode": 9,
+  "versionName": "1.8",
+  "sha256": "f12ee161767e3231cb27c149c433547edf20d06709b2bce321fda608288efb29",
+  "notes": "Kurze Quellenangabe, Gesundheit in Kacheln nach Herz und Atmung.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-9.apk"
 }

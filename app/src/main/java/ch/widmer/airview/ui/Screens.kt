@@ -1,6 +1,8 @@
 package ch.widmer.airview.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -91,10 +93,11 @@ fun SourceLine(s: Snapshot) {
         s.sources.isEmpty() -> "Keine Datenquellen"
         s.activeSources.isEmpty() -> "Daten aus allen Apps"
         active.isEmpty() -> "Keine Quelle gewählt"
-        else -> "Daten von " + active.joinToString(" und ") { it.label }
+        else -> active.joinToString(" und ") { it.label }
     }
     Text(
-        label, style = Type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
+        label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        style = Type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
         color = p.muted, modifier = Modifier.clickable { open = true }.padding(vertical = 4.dp),
     )
     if (open) {
@@ -305,45 +308,87 @@ private fun StageRows(n: SleepNight) {
 @Composable
 fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
     val p = LocalPalette.current
+    val latest = listOf(s.restingHr, s.hrv, s.spo2, s.respRate).mapNotNull { it.lastOrNull()?.date }.maxOrNull()
     Page {
-        Metric("Ruhepuls", s.restingHr, "bpm", "%.0f", p.heart)
-        Metric("Herzfrequenzvariabilität", s.hrv, "ms", "%.0f", p.heart)
-        Metric("Sauerstoffsättigung", s.spo2, "%", "%.1f", p.sleep)
-        Metric("Atemfrequenz", s.respRate, "pro min", "%.1f", p.sleep)
-        s.weightKg?.let {
-            Section("Gewicht")
-            Big("%.1f".format(it * reveal()), "kg", 48)
+        Text("Gesundheit", style = Type.title, color = p.muted)
+        Text(
+            latest?.let { if (it == LocalDate.now()) "Letzte Nacht" else "Nacht auf " + it.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE)) }
+                ?: "Noch keine Nacht gemessen",
+            style = Type.numeral.copy(fontSize = 40.sp, lineHeight = 44.sp), color = p.ink, modifier = Modifier.padding(top = 4.dp),
+        )
+
+        Section("Herz")
+        TileRow {
+            Tile("Ruhepuls", s.restingHr, "bpm", "%.0f", p.heart, Modifier.weight(1f))
+            Tile("HRV", s.hrv, "ms", "%.0f", p.heart, Modifier.weight(1f))
         }
-        Spacer(Modifier.height(28.dp))
-        Text("Keine medizinische Diagnose.",
-            style = Type.small, color = p.muted)
+        Section("Atmung")
+        TileRow {
+            Tile("Sauerstoff", s.spo2, "%", "%.1f", p.sleep, Modifier.weight(1f))
+            Tile("Atemfrequenz", s.respRate, "/min", "%.1f", p.sleep, Modifier.weight(1f))
+        }
+        s.weightKg?.let {
+            Section("Körper")
+            TileRow { Tile("Gewicht", listOf(DayValue(LocalDate.now(), it)), "kg", "%.1f", p.move, Modifier.weight(1f), trend = false) }
+        }
+
+        Spacer(Modifier.height(36.dp))
+        Text("Keine medizinische Diagnose.", style = Type.small, color = p.muted)
         footer()
     }
 }
 
 @Composable
-private fun Metric(label: String, data: List<DayValue>, unit: String, fmt: String, color: Color) {
+private fun TileRow(content: @Composable RowScope.() -> Unit) =
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp), content = content)
+
+/**
+ * Eine Kachel pro Messwert. Solange weniger als 4 Messtage vorliegen, zeigen
+ * vier Punkte, wie weit dein persönlicher Schnitt schon aufgebaut ist.
+ */
+@Composable
+private fun Tile(label: String, data: List<DayValue>, unit: String, fmt: String, color: Color, modifier: Modifier, trend: Boolean = true) {
     val p = LocalPalette.current
-    Section(label)
-    if (data.isEmpty()) { Note("Noch keine Werte."); return }
-    val last = data.last().value
-    // Vergleich mit den Tagen davor, nicht mit sich selbst – und erst ab ein paar Tagen
-    val before = data.dropLast(1)
-    val minDays = 3
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-        Column(Modifier.weight(1f)) {
-            Big(fmt.format(last * reveal()), unit, 48)
-            val txt = if (before.size < minDays) {
-                val n = data.size
-                "Vergleich ab ${minDays + 1} Messtagen ($n bisher)"
-            } else {
-                val avg = before.map { it.value }.average()
-                val delta = last - avg
-                if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "wie dein Schnitt"
-                else "${if (delta > 0) "+" else "−"}${fmt.format(abs(delta))} zum Schnitt (${fmt.format(avg)})"
-            }
-            Text(txt, style = Type.small, color = p.muted)
+    val need = 4
+    Column(
+        modifier.fillMaxHeight().clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+            .background(p.track.copy(alpha = .45f)).padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Canvas(Modifier.size(8.dp)) { drawCircle(color) }
+            Spacer(Modifier.width(8.dp))
+            Text(label, style = Type.small, color = p.ink)
         }
-        Spark(data, color, Modifier.width(120.dp).height(48.dp).padding(bottom = 6.dp))
+        Spacer(Modifier.height(10.dp))
+        if (data.isEmpty()) {
+            Text("–", style = Type.numeral.copy(fontSize = 40.sp, lineHeight = 40.sp), color = p.muted)
+            Spacer(Modifier.weight(1f))
+            Text("Keine Werte", style = Type.small, color = p.muted)
+            return@Column
+        }
+        val last = data.last().value
+        Big(fmt.format(last * reveal()), unit, 40)
+        Spacer(Modifier.weight(1f).heightIn(min = 12.dp))
+        if (!trend) return@Column
+        val before = data.dropLast(1)
+        if (before.size < need - 1) {
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                repeat(need) { i ->
+                    Canvas(Modifier.size(7.dp)) { drawCircle(if (i < data.size) color else p.track) }
+                }
+                Spacer(Modifier.width(4.dp))
+                Text("Basis ${data.size}/$need", style = Type.small, color = p.muted)
+            }
+        } else {
+            val avg = before.map { it.value }.average()
+            val delta = last - avg
+            Spark(data, color, Modifier.fillMaxWidth().height(28.dp))
+            Spacer(Modifier.height(6.dp))
+            Text(
+                if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "wie dein Schnitt"
+                else "${if (delta > 0) "+" else "−"}${fmt.format(abs(delta))} zum Schnitt",
+                style = Type.small, color = p.muted,
+            )
+        }
     }
 }

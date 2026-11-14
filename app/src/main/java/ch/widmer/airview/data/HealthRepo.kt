@@ -71,6 +71,15 @@ data class Snapshot(
     val activeSources: Set<String> = emptySet(),   // leer = alle
 )
 
+/** Lesbare Namen für Quellen, die Android ohne Zusatzrechte nicht beschriftet. */
+fun friendlyName(pkg: String): String? = when {
+    pkg.startsWith("com.fitbit") -> "Google Health"
+    pkg.startsWith("com.android.healthconnect.phone") || pkg == "android" -> "Handy"
+    pkg == "com.google.android.apps.fitness" -> "Google Fit"
+    pkg == "com.sec.android.app.shealth" -> "Samsung Health"
+    else -> null
+}
+
 data class Source(val pkg: String, val label: String, val firstDay: LocalDate, val days: Int)
 
 /** Gewählte Datenquellen (leer = alle). */
@@ -107,7 +116,8 @@ class HealthRepo(private val context: Context) {
         scan(ActiveCaloriesBurnedRecord::class) { it.startTime }
         val pm = context.packageManager
         return seen.map { (pkg, days) ->
-            val label = runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+            val label = friendlyName(pkg) ?: runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }
+                .getOrDefault(pkg.substringAfterLast('.').replaceFirstChar { it.uppercase() })
             Source(pkg, label, days.min(), days.size)
         }.sortedByDescending { it.days }
     }
