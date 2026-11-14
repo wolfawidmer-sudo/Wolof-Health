@@ -111,7 +111,7 @@ private fun DrawScope.ring(inset: Float, sw: Float, frac: Float, c: Color, ink: 
 /** Ringe-Abschnitt für «Heute»: grosse Ringe, Werte daneben, darunter die Woche zum Antippen. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun RingsSection(days: List<RingDay>, goals: Goals, onGoals: (Goals) -> Unit) {
+fun RingsSection(days: List<RingDay>, goals: Goals, ringSize: Dp, onGoals: (Goals) -> Unit) {
     if (days.isEmpty()) return
     val p = LocalPalette.current
     val ctx = LocalContext.current
@@ -126,21 +126,22 @@ fun RingsSection(days: List<RingDay>, goals: Goals, onGoals: (Goals) -> Unit) {
     LaunchedEffect(sel) { if (first) first = false else { swap.snapTo(0f); swap.animateTo(1f, tween(300)) } }
     val rings = ringsFor(day, goals)
 
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         // Ringe antippen öffnet die Ziele
         Box(Modifier.clip(CircleShape).clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); editing = true }
             .graphicsLayer { val s = .92f + .08f * r; scaleX = s; scaleY = s }) {
-            RingStack(day, goals, 150.dp, 16.dp, 5.dp, progress = minOf(r, swap.value))
+            val stroke = ringSize * 0.085f
+            RingStack(day, goals, ringSize, stroke, stroke * 0.28f, progress = minOf(r, swap.value))
         }
-        Spacer(Modifier.width(22.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(Modifier.height(16.dp))
+        Row(Modifier.fillMaxWidth()) {
             rings.forEach { ring ->
-                Column {
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(ring.label, style = Type.small, color = ring.color)
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text("%,d".format(Locale.forLanguageTag("de-CH"), (ring.value * r).roundToInt()), style = Type.numeral.copy(fontSize = 28.sp, lineHeight = 28.sp), color = p.ink)
-                        Text(" / ${"%,d".format(Locale.forLanguageTag("de-CH"), ring.goal.roundToInt())} ${ring.unit}".trimEnd(), style = Type.small, color = p.muted, modifier = Modifier.padding(bottom = 3.dp))
-                    }
+                    Text("%,d".format(Locale.forLanguageTag("de-CH"), (ring.value * r).roundToInt()),
+                        style = Type.numeral.copy(fontSize = 28.sp, lineHeight = 30.sp), color = p.ink)
+                    Text("von ${"%,d".format(Locale.forLanguageTag("de-CH"), ring.goal.roundToInt())} ${ring.unit}".trimEnd(),
+                        style = Type.small, color = p.muted)
                 }
             }
         }

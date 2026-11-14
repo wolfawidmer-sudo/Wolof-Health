@@ -40,19 +40,36 @@ val BarSpace = 68.dp + 24.dp
 
 /**
  * Eine Seite füllt genau den Platz zwischen Statusleiste und Taskleiste.
- * Diagramme nehmen per weight() den Rest – nichts scrollt, nichts bleibt leer.
+ * Grundsatz: ein Hauptelement pro Seite skaliert mit dem Bildschirm (behält aber seine
+ * Proportionen), alles andere hat seine natürliche Grösse. Übriger Platz wird als
+ * gleichmässiger Abstand zwischen den Gruppen verteilt – nichts wird verzerrt.
  */
 @Composable
-fun Page(content: @Composable ColumnScope.() -> Unit) {
+fun Page(content: @Composable ColumnScope.(avail: androidx.compose.ui.unit.Dp) -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val nav = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val h = maxHeight
+        val inner = h - 12.dp - (BarSpace + nav + 16.dp)
         // verticalScroll nur, damit «zum Aktualisieren ziehen» funktioniert
         Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-            Column(Modifier.fillMaxWidth().height(h).padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = BarSpace + nav + 12.dp)) {
-                content()
-            }
+            Column(
+                Modifier.fillMaxWidth().height(h).padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = BarSpace + nav + 16.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) { content(inner) }
         }
+    }
+}
+
+/** Eine zusammengehörige Gruppe: optionaler Titel, dann Inhalt. Abstände entstehen zwischen Gruppen. */
+@Composable
+fun Group(title: String? = null, aside: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    val p = LocalPalette.current
+    Column(Modifier.fillMaxWidth()) {
+        if (title != null) Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
+            Text(title, style = Type.title, color = p.ink, modifier = Modifier.weight(1f))
+            if (aside != null) Text(aside, style = Type.small, color = p.muted)
+        }
+        content()
     }
 }
 
@@ -148,6 +165,7 @@ fun SourceLine(s: Snapshot) {
 }
 
 // ---------- Heute ----------
+// Hauptelement: die Ringe. Sie wachsen mit dem Bildschirm, alles darunter bleibt kompakt.
 
 @Composable
 fun TodayScreen(s: Snapshot) {
@@ -156,16 +174,17 @@ fun TodayScreen(s: Snapshot) {
     val r = reveal()
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var goals by remember { mutableStateOf(GoalStore.load(ctx)) }
-    Page {
-        Text(today.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE)), style = Type.title, color = p.muted)
-        SourceLine(s)
-        Spacer(Modifier.height(16.dp))
-        RingsSection(s.rings, goals) { goals = it }
-
-        Section("Dein Tag")
-        DayStrip(today, s.hrToday, s.sleep, s.workouts, Modifier.fillMaxWidth().weight(1f))
-
-        Spacer(Modifier.height(16.dp))
+    Page { avail ->
+        // feste Teile: Kopf 56, Werte 56, Woche 62, Tag 30+170, Zahlen 58, Abstände ~70
+        val ring = (avail - 502.dp).coerceIn(150.dp, 280.dp)
+        Column {
+            Text(today.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE)), style = Type.title, color = p.muted)
+            SourceLine(s)
+        }
+        Column { RingsSection(s.rings, goals, ring) { goals = it } }
+        Group("Dein Tag") {
+            DayStrip(today, s.hrToday, s.sleep, s.workouts, Modifier.fillMaxWidth().height(170.dp))
+        }
         val night = s.sleep.lastOrNull()?.takeIf { it.date == today }
         Row(Modifier.fillMaxWidth()) {
             Stat("km", "%.1f".format(s.distanceM / 1000 * r), null, Modifier.weight(1f))
@@ -176,101 +195,125 @@ fun TodayScreen(s: Snapshot) {
 }
 
 // ---------- Fitness ----------
+// Hauptelement: die Schrittwoche. Kalorien kompakt; Trainings so viele, wie Platz haben.
 
 @Composable
 fun FitnessScreen(s: Snapshot) {
     val p = LocalPalette.current
     val goal = GoalStore.load(androidx.compose.ui.platform.LocalContext.current).steps.toDouble()
-    Page {
+    Page { avail ->
+        val stepsH = (avail * 0.40f).coerceIn(200.dp, 290.dp)
+        val kcalH = 150.dp
+        val rowH = 54.dp
+        val fit = ((avail - stepsH - kcalH - 34.dp * 3 - 60.dp).value / rowH.value).toInt().coerceIn(1, 6)
+
         val avg = s.stepsWeek.map { it.value }.average()
-        Section("Schritte", if (!avg.isNaN()) "Schnitt ${avg.grouped()}" else null)
-        if (s.stepsWeek.isNotEmpty()) DayBars(s.stepsWeek, p.move, goal, Modifier.fillMaxWidth().weight(1.2f))
-        else Spacer(Modifier.weight(1.2f))
-
-        Section("Kalorien", "kcal")
-        if (s.kcalWeek.any { it.value > 0 }) DayBars(s.kcalWeek, p.awake, modifier = Modifier.fillMaxWidth().weight(1f))
-        else Spacer(Modifier.weight(1f))
-
-        Section("Trainings", s.vo2max?.let { "VO₂max %.0f".format(it) })
-        if (s.workouts.isEmpty()) Note("Keine in den letzten 30 Tagen")
-        s.workouts.take(3).forEach { w ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Canvas(Modifier.size(8.dp)) { drawCircle(p.move) }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(w.title, style = Type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = p.ink)
-                    Text(
-                        listOfNotNull(
-                            w.start.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE d. MMM, HH:mm", DE)),
-                            w.distanceM?.takeIf { it > 50 }?.let { "%.1f km".format(it / 1000) },
-                            w.avgHr?.let { "$it bpm" },
-                        ).joinToString(", "),
-                        style = Type.small, color = p.muted, maxLines = 1,
-                    )
+        Group("Schritte", if (!avg.isNaN()) "Schnitt ${avg.grouped()}" else null) {
+            if (s.stepsWeek.isNotEmpty()) DayBars(s.stepsWeek, p.move, goal, Modifier.fillMaxWidth().height(stepsH))
+        }
+        Group("Kalorien", "kcal") {
+            if (s.kcalWeek.any { it.value > 0 }) DayBars(s.kcalWeek, p.awake, modifier = Modifier.fillMaxWidth().height(kcalH))
+        }
+        Group("Trainings", s.vo2max?.let { "VO₂max %.0f".format(it) }) {
+            if (s.workouts.isEmpty()) Note("Keine in den letzten 30 Tagen")
+            s.workouts.take(fit).forEach { w ->
+                Row(Modifier.fillMaxWidth().height(rowH), verticalAlignment = Alignment.CenterVertically) {
+                    Canvas(Modifier.size(8.dp)) { drawCircle(p.move) }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(w.title, style = Type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = p.ink)
+                        Text(
+                            listOfNotNull(
+                                w.start.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE d. MMM, HH:mm", DE)),
+                                w.distanceM?.takeIf { it > 50 }?.let { "%.1f km".format(it / 1000) },
+                            ).joinToString(", "),
+                            style = Type.small, color = p.muted, maxLines = 1,
+                        )
+                    }
+                    Big(dur(Duration.between(w.start, w.end).toMinutes()), null, 26)
                 }
-                Big(dur(Duration.between(w.start, w.end).toMinutes()), null, 26)
             }
         }
     }
 }
 
 // ---------- Schlaf ----------
+// Hauptelement: das Hypnogramm (mit Höchstmass). Phasen als ein geteilter Balken.
 
 @Composable
 fun SleepScreen(s: Snapshot) {
     val p = LocalPalette.current
     val n = s.sleep.lastOrNull()
-    Page {
+    Page { avail ->
         if (n == null) {
-            Section("Schlaf")
-            Note("Noch keine Nacht erfasst")
+            Group("Schlaf") { Note("Noch keine Nacht erfasst") }
             return@Page
         }
-        Text("Nacht auf ${n.date.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE))}", style = Type.title, color = p.muted)
-        Spacer(Modifier.height(4.dp))
-        val inBed = Duration.between(n.start, n.end).toMinutes()
-        Row(verticalAlignment = Alignment.Bottom) {
-            Big(dur((n.asleepMinutes * reveal()).toLong()), "h", 88, color = p.ink)
-            Spacer(Modifier.weight(1f))
-            Text("${n.asleepMinutes * 100 / inBed.coerceAtLeast(1)} % im Bett", style = Type.small, color = p.muted,
-                modifier = Modifier.padding(bottom = 14.dp))
+        val many = s.sleep.size > 1
+        val fixed = 30.dp + 100.dp + 40.dp + 86.dp + (if (many) 210.dp else 0.dp) + 60.dp
+        val hypH = (avail - fixed).coerceIn(150.dp, 240.dp)
+        Column {
+            Text("Nacht auf ${n.date.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE))}", style = Type.title, color = p.muted)
+            Row(verticalAlignment = Alignment.Bottom) {
+                Big(dur((n.asleepMinutes * reveal()).toLong()), "h", 88, color = p.ink)
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 12.dp)) {
+                    Text("${hhmm(n.start)} bis ${hhmm(n.end)}", style = Type.body, color = p.ink)
+                    val inBed = Duration.between(n.start, n.end).toMinutes()
+                    Text("${n.asleepMinutes * 100 / inBed.coerceAtLeast(1)} % im Bett", style = Type.small, color = p.muted)
+                }
+            }
         }
-
-        Section("Phasen")
-        Hypnogram(n, Modifier.fillMaxWidth().weight(1.3f))
-        if (n.stages.isNotEmpty()) {
-            Spacer(Modifier.height(14.dp))
-            StageRows(n)
-        }
-        if (s.sleep.size > 1) {
-            Section("Dauer", "Schnitt ${dur(s.sleep.map { it.asleepMinutes }.average().toLong())} h")
+        Group("Phasen") { Hypnogram(n, Modifier.fillMaxWidth().height(hypH)) }
+        if (n.stages.isNotEmpty()) StageSummary(n)
+        if (many) Group("Dauer", "Schnitt ${dur(s.sleep.map { it.asleepMinutes }.average().toLong())} h") {
             DayBars(s.sleep.takeLast(14).map { DayValue(it.date, it.asleepMinutes / 60.0) }, p.sleep, goal = 8.0,
-                modifier = Modifier.fillMaxWidth().weight(1f), format = { "${dur((it * 60).toLong())} h" })
+                modifier = Modifier.fillMaxWidth().height(170.dp), format = { "${dur((it * 60).toLong())} h" })
         }
     }
 }
 
+/** Alle Phasen in einem Balken, darunter vier Spalten mit Dauer und Anteil. */
 @Composable
-private fun StageRows(n: SleepNight) {
+private fun StageSummary(n: SleepNight) {
     val p = LocalPalette.current
+    val r = reveal()
     val rows = listOf(
         Triple("Wach", n.minutesIn(S.STAGE_TYPE_AWAKE, S.STAGE_TYPE_AWAKE_IN_BED, S.STAGE_TYPE_OUT_OF_BED), p.awake),
         Triple("REM", n.minutesIn(S.STAGE_TYPE_REM), p.sleepLight),
-        Triple("Leicht", n.minutesIn(S.STAGE_TYPE_LIGHT, S.STAGE_TYPE_SLEEPING), p.sleepLight),
+        Triple("Leicht", n.minutesIn(S.STAGE_TYPE_LIGHT, S.STAGE_TYPE_SLEEPING), p.sleepLight.copy(alpha = .7f)),
         Triple("Tief", n.minutesIn(S.STAGE_TYPE_DEEP), p.sleep),
     )
     val total = rows.sumOf { it.second }.coerceAtLeast(1)
-    rows.forEachIndexed { i, (label, min, c) ->
-        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, style = Type.body, color = p.ink, modifier = Modifier.width(64.dp))
-            Box(Modifier.weight(1f)) { Meter(min.toFloat() / total, c, i, rows.size) }
-            Text("${dur(min)} h", style = Type.body, color = p.ink, modifier = Modifier.width(76.dp).padding(start = 12.dp))
-            Text("${min * 100 / total} %", style = Type.small, color = p.muted, modifier = Modifier.width(40.dp))
+    Column {
+        Canvas(Modifier.fillMaxWidth().height(12.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))) {
+            drawRect(p.track)
+            var x = 0f
+            rows.forEach { (_, m, c) ->
+                val w = size.width * m / total * r
+                drawRect(c, Offset(x, 0f), Size(w, size.height))
+                x += w + 2f
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.fillMaxWidth()) {
+            rows.forEach { (label, m, c) ->
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Canvas(Modifier.size(7.dp)) { drawCircle(c) }
+                        Spacer(Modifier.width(6.dp))
+                        Text(label, style = Type.small, color = p.muted)
+                    }
+                    Text(dur(m), style = Type.numeral.copy(fontSize = 22.sp, lineHeight = 26.sp), color = p.ink)
+                    Text("${m * 100 / total} %", style = Type.small, color = p.muted)
+                }
+            }
         }
     }
 }
 
 // ---------- Gesundheit ----------
+// Messreihen statt Kacheln: jede Zeile ein Instrument, gleichmässig über die Höhe verteilt.
 
 @Composable
 fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
@@ -282,21 +325,11 @@ fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
                 ?: "Noch keine Nacht",
             style = Type.numeral.copy(fontSize = 40.sp, lineHeight = 44.sp), color = p.ink,
         )
-        Section("Herz")
-        TileRow(Modifier.weight(1f)) {
-            Tile("Ruhepuls", s.restingHr, "bpm", "%.0f", p.heart, Modifier.weight(1f))
-            Tile("HRV", s.hrv, "ms", "%.0f", p.heart, Modifier.weight(1f))
-        }
-        Section("Atmung")
-        TileRow(Modifier.weight(1f)) {
-            Tile("Sauerstoff", s.spo2, "%", "%.1f", p.sleep, Modifier.weight(1f))
-            Tile("Atemfrequenz", s.respRate, "/min", "%.1f", p.sleep, Modifier.weight(1f))
-        }
-        s.weightKg?.let {
-            Spacer(Modifier.height(12.dp))
-            TileRow(Modifier.weight(.6f)) { Tile("Gewicht", listOf(DayValue(LocalDate.now(), it)), "kg", "%.1f", p.move, Modifier.weight(1f), trend = false) }
-        }
-        Spacer(Modifier.height(14.dp))
+        MetricRow("Ruhepuls", s.restingHr, "bpm", "%.0f", p.heart)
+        MetricRow("HRV", s.hrv, "ms", "%.0f", p.heart)
+        MetricRow("Sauerstoff", s.spo2, "%", "%.1f", p.sleep)
+        MetricRow("Atemfrequenz", s.respRate, "/min", "%.1f", p.sleep)
+        s.weightKg?.let { MetricRow("Gewicht", listOf(DayValue(LocalDate.now(), it)), "kg", "%.1f", p.move, trend = false) }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Keine Diagnose", style = Type.small, color = p.muted, modifier = Modifier.weight(1f))
             footer()
@@ -304,58 +337,51 @@ fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
     }
 }
 
-@Composable
-private fun TileRow(modifier: Modifier, content: @Composable RowScope.() -> Unit) =
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), content = content)
-
 /**
- * Eine Kachel pro Messwert. Solange weniger als 4 Messtage vorliegen, zeigen
- * vier Punkte, wie weit dein persönlicher Schnitt schon aufgebaut ist.
+ * Eine Messreihe: links Wert, rechts Verlauf. Solange weniger als 4 Messtage vorliegen,
+ * zeigen vier Punkte, wie weit dein persönlicher Schnitt aufgebaut ist.
  */
 @Composable
-private fun Tile(label: String, data: List<DayValue>, unit: String, fmt: String, color: Color, modifier: Modifier, trend: Boolean = true) {
+private fun MetricRow(label: String, data: List<DayValue>, unit: String, fmt: String, color: Color, trend: Boolean = true) {
     val p = LocalPalette.current
     val need = 4
-    Column(
-        modifier.fillMaxHeight().clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
-            .background(p.track.copy(alpha = .45f)).padding(16.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Canvas(Modifier.size(8.dp)) { drawCircle(color) }
-            Spacer(Modifier.width(8.dp))
-            Text(label, style = Type.small, color = p.ink)
-        }
-        Spacer(Modifier.height(10.dp))
-        if (data.isEmpty()) {
-            Text("–", style = Type.numeral.copy(fontSize = 40.sp, lineHeight = 40.sp), color = p.muted)
-            Spacer(Modifier.weight(1f))
-            Text("Keine Werte", style = Type.small, color = p.muted)
-            return@Column
-        }
-        val last = data.last().value
-        Big(fmt.format(last * reveal()), unit, 40)
-        if (!trend) return@Column
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(p.track))
         Spacer(Modifier.height(12.dp))
-        val before = data.dropLast(1)
-        if (before.size < need - 1) {
-            Spacer(Modifier.weight(1f))
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                repeat(need) { i ->
-                    Canvas(Modifier.size(7.dp)) { drawCircle(if (i < data.size) color else p.track) }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Canvas(Modifier.size(8.dp)) { drawCircle(color) }
+                    Spacer(Modifier.width(8.dp))
+                    Text(label, style = Type.small, color = p.ink)
                 }
-                Spacer(Modifier.width(4.dp))
-                Text("Basis ${data.size}/$need", style = Type.small, color = p.muted)
+                if (data.isEmpty()) Text("–", style = Type.numeral.copy(fontSize = 44.sp, lineHeight = 48.sp), color = p.muted)
+                else Big(fmt.format(data.last().value * reveal()), unit, 44)
             }
-        } else {
-            val avg = before.map { it.value }.average()
-            val delta = last - avg
-            Spark(data, color, Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 28.dp, max = 120.dp).fillMaxHeight())
-            Spacer(Modifier.height(6.dp))
-            Text(
-                if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "wie dein Schnitt"
-                else "${if (delta > 0) "+" else "−"}${fmt.format(abs(delta))} zum Schnitt",
-                style = Type.small, color = p.muted,
-            )
+            Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(132.dp).padding(bottom = 6.dp)) {
+                when {
+                    data.isEmpty() -> Text("Keine Werte", style = Type.small, color = p.muted)
+                    !trend -> {}
+                    data.size < need -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            repeat(need) { i -> Canvas(Modifier.size(7.dp)) { drawCircle(if (i < data.size) color else p.track) } }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text("Basis ${data.size}/$need", style = Type.small, color = p.muted)
+                    }
+                    else -> {
+                        val before = data.dropLast(1).map { it.value }.average()
+                        val delta = data.last().value - before
+                        Spark(data, color, Modifier.fillMaxWidth().height(34.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "wie dein Schnitt"
+                            else "${if (delta > 0) "+" else "−"}${fmt.format(abs(delta))} zum Schnitt",
+                            style = Type.small, color = p.muted,
+                        )
+                    }
+                }
+            }
         }
     }
 }

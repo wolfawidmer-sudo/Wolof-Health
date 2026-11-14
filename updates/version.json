@@ -1,7 +1,7 @@
 {
-  "versionCode": 10,
-  "versionName": "1.9",
-  "sha256": "9543275baefee0d3e1106455c877bcc42f3b827f75f28ea4557ff2df8694aa25",
-  "notes": "Jede Seite passt genau über die Leiste, ohne Scrollen.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-10.apk"
+  "versionCode": 11,
+  "versionName": "1.10",
+  "sha256": "dd2374148661e3eb330d5df0abf51161b2ea914a6e3b780184671c35cc0f962f",
+  "notes": "Neu aufgeteilte Seiten: ein Hauptelement pro Seite, nichts mehr gestreckt.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-11.apk"
 }
