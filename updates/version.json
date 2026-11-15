@@ -1,7 +1,7 @@
 {
-  "versionCode": 15,
-  "versionName": "1.14",
-  "sha256": "b1eafd4093c6d21a13935595c25e9fabc8f5e8c706ceff923ec2810c55577817",
-  "notes": "Icon repariert, Ladebildschirm passt zur Heute-Seite.",
-  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-15.apk"
+  "versionCode": 16,
+  "versionName": "2.0",
+  "sha256": "61f836da68fda64fce109af2caa8c2149ab1a93491276b7bf6010f2cf300026d",
+  "notes": "Version 2.0: Erholung, Schlafwert, Belastung mit Pulszonen, Nachtwerte mit deinem Bereich, Detailansichten, Einstellungen mit Profil, Widget, Hinweise und Monatsbericht.",
+  "apk": "https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/wolof-health-16.apk"
 }

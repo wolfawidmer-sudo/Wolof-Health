@@ -11,3 +11,10 @@
 - Vor dem Veröffentlichen Screenshots mit `gradle testDebugUnitTest -Proborazzi.test.record=true` ansehen.
 - Animationen beim Betreten einer Seite: so kurz wie möglich (Reveal 1100 ms bei jedem Besuch, startet sofort mit der Ziel-Seite).
 - Seitenaufbau: jede Seite passt genau über die Taskleiste. Ein Hauptelement pro Seite skaliert (Ringe, Schrittwoche, Hypnogramm), alles andere natürliche Grösse; Restplatz = gleichmässige Abstände zwischen Gruppen. Nie Diagramme verzerren.
+- Architektur (ab 2.0): `data/HealthRepo` liest Health Connect und baut `DaySummary` pro Tag (Cache `DayCache` für Tage vor gestern),
+  `data/Analytics` enthält alle eigenen Werte (Zonen, TRIMP, Schlafwert, Erholung, Normalbereich, Belastung 7/28, Schlafbedarf, Trends),
+  `data/Insights` die Nachtwerte mit Bereich. Detailansichten in `ui/Sheets.kt` (dürfen scrollen, die vier Seiten nicht).
+  Widget `widget/RingsWidget`, Hintergrund und Hinweise in `work/Background.kt`.
+- Google Health schreibt keine aktiven kcal und kein SpO2 nach Health Connect: aktive kcal = Gesamt − Grundumsatz (Profil), als Schätzung kennzeichnen.
+- Eigene Werte sind Näherungen und tragen eigene Namen (Erholung, Schlafwert, Belastung); Bestandteile immer in der Detailansicht zeigen.
+- Wochenansichten haben feste Plätze (7 Tage, 14 Nächte), damit sie mit wenig Daten nicht zerfallen.

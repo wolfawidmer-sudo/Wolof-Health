@@ -34,21 +34,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ch.widmer.airview.data.RingDay
+import ch.widmer.airview.data.Goals
+import ch.widmer.airview.data.GoalStore
 import java.time.LocalDate
 import java.time.format.TextStyle as JTextStyle
 import java.util.Locale
 import kotlin.math.roundToInt
-
-data class Goals(val steps: Int = 10_000, val moveKcal: Int = 500, val exerciseMin: Int = 30)
-
-object GoalStore {
-    private fun prefs(c: Context) = c.getSharedPreferences("goals", Context.MODE_PRIVATE)
-    fun load(c: Context) = prefs(c).let {
-        Goals(it.getInt("steps", 10_000), it.getInt("move", 500), it.getInt("ex", 30))
-    }
-    fun save(c: Context, g: Goals) = prefs(c).edit()
-        .putInt("steps", g.steps).putInt("move", g.moveKcal).putInt("ex", g.exerciseMin).apply()
-}
 
 private data class Ring(val label: String, val value: Double, val goal: Double, val color: Color, val unit: String)
 
@@ -122,7 +113,7 @@ fun RingsSection(days: List<RingDay>, goals: Goals, ringSize: Dp, onGoals: (Goal
     val p = LocalPalette.current
     val ctx = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    var editing by remember { mutableStateOf(false) }
+    val open = LocalOpenSheet.current
     var sel by remember(days) { mutableIntStateOf(days.lastIndex) }
     val day = days[sel]
     val r = reveal()
@@ -134,15 +125,16 @@ fun RingsSection(days: List<RingDay>, goals: Goals, ringSize: Dp, onGoals: (Goal
 
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         // Ringe antippen öffnet die Ziele
-        Box(Modifier.clip(CircleShape).clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); editing = true }
+        Box(Modifier.clip(CircleShape).clickable { haptic.performHapticFeedback(HapticFeedbackType.LongPress); open(Sheet.Ring(0)) }
             .graphicsLayer { val s = .78f + .22f * r; scaleX = s; scaleY = s; alpha = (r * 1.6f).coerceAtMost(1f); rotationZ = -40f * (1f - r) }) {
             val stroke = ringSize * 0.085f
             RingStack(day, goals, ringSize, stroke, stroke * 0.28f, progress = minOf(LocalReveal.current, swap.value))
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth()) {
-            rings.forEach { ring ->
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+            rings.forEachIndexed { ri, ring ->
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable { open(Sheet.Ring(ri)) }.padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(ring.label, style = Type.small, color = ring.color)
                     Text("%,d".format(Locale.forLanguageTag("de-CH"), (ring.value * r).roundToInt()),
                         style = Type.numeral.copy(fontSize = 28.sp, lineHeight = 30.sp), color = p.ink)
@@ -174,13 +166,10 @@ fun RingsSection(days: List<RingDay>, goals: Goals, ringSize: Dp, onGoals: (Goal
         }
     }
 
-    if (editing) GoalsDialog(goals, onDismiss = { editing = false }) { g ->
-        onGoals(g); GoalStore.save(ctx, g); editing = false
-    }
 }
 
 @Composable
-private fun GoalsDialog(start: Goals, onDismiss: () -> Unit, onSave: (Goals) -> Unit) {
+internal fun GoalsDialog(start: Goals, onDismiss: () -> Unit, onSave: (Goals) -> Unit) {
     val p = LocalPalette.current
     var g by remember { mutableStateOf(start) }
     AlertDialog(
@@ -207,9 +196,9 @@ private fun GoalsDialog(start: Goals, onDismiss: () -> Unit, onSave: (Goals) -> 
 }
 
 @Composable
-private fun Stepper(label: String, value: String, c: Color, minus: () -> Unit, plus: () -> Unit) {
+internal fun Stepper(label: String, value: String, c: Color, minus: () -> Unit, plus: () -> Unit) {
     val p = LocalPalette.current
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(label, style = Type.small, color = c)
             Text(value, style = Type.numeral.copy(fontSize = 26.sp), color = p.ink)

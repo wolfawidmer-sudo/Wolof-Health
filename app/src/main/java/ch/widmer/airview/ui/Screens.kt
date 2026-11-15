@@ -3,6 +3,9 @@ package ch.widmer.airview.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import ch.widmer.airview.data.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +24,7 @@ import ch.widmer.airview.data.DayValue
 import ch.widmer.airview.data.SleepNight
 import ch.widmer.airview.data.Snapshot
 import ch.widmer.airview.data.SourceStore
+import ch.widmer.airview.data.GoalStore
 import androidx.compose.foundation.clickable
 import java.time.Duration
 import java.time.LocalDate
@@ -62,10 +66,14 @@ fun Page(content: @Composable ColumnScope.(avail: androidx.compose.ui.unit.Dp) -
 
 /** Eine zusammengehörige Gruppe: optionaler Titel, dann Inhalt. Abstände entstehen zwischen Gruppen. */
 @Composable
-fun Group(title: String? = null, aside: String? = null, content: @Composable ColumnScope.() -> Unit) {
+fun Group(title: String? = null, aside: String? = null, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val p = LocalPalette.current
     Column(Modifier.fillMaxWidth()) {
-        if (title != null) Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
+        if (title != null) Row(
+            Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)).clickable(onClick = onClick) else Modifier)
+                .padding(bottom = 10.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
             Text(title, style = Type.title, color = p.ink, modifier = Modifier.weight(1f))
             if (aside != null) Text(aside, style = Type.small, color = p.muted)
         }
@@ -94,10 +102,10 @@ fun Big(value: String, unit: String? = null, size: Int = 64, color: Color = Loca
 }
 
 @Composable
-fun Stat(label: String, value: String, unit: String?, modifier: Modifier = Modifier) {
+fun Stat(label: String, value: String, unit: String?, modifier: Modifier = Modifier, color: Color = LocalPalette.current.ink, onClick: (() -> Unit)? = null) {
     val p = LocalPalette.current
-    Column(modifier) {
-        Big(value, unit, size = 30)
+    Column(if (onClick != null) modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).clickable(onClick = onClick) else modifier) {
+        Big(value, unit, size = 30, color = color)
         Text(label, style = Type.small, color = p.muted)
     }
 }
@@ -111,14 +119,15 @@ fun Note(text: String) {
 val LocalRefresh = compositionLocalOf<() -> Unit> { {} }
 
 /** Zeigt, aus welchen Apps die Daten stammen; antippen öffnet die Auswahl. */
+/** Zeile unter dem Datum: Datenquellen, antippen öffnet die Einstellungen. */
 @Composable
 fun SourceLine(s: Snapshot) {
     val p = LocalPalette.current
-    val ctx = androidx.compose.ui.platform.LocalContext.current
-    val refresh = LocalRefresh.current
-    var open by remember { mutableStateOf(false) }
+    val open = LocalOpenSheet.current
     val active = s.sources.filter { s.activeSources.isEmpty() || it.pkg in s.activeSources }
+    val needsProfile = !s.profile.confirmed
     val label = when {
+        needsProfile -> "Profil ergänzen für genaue Kalorien"
         s.sources.isEmpty() -> "Keine Datenquellen"
         s.activeSources.isEmpty() -> "Daten aus allen Apps"
         active.isEmpty() -> "Keine Quelle gewählt"
@@ -127,56 +136,25 @@ fun SourceLine(s: Snapshot) {
     Text(
         label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         style = Type.small.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline),
-        color = p.muted, modifier = Modifier.clickable { open = true }.padding(vertical = 4.dp),
+        color = if (needsProfile) p.awake else p.muted,
+        modifier = Modifier.clickable { open(Sheet.Settings) }.padding(vertical = 4.dp),
     )
-    if (open) {
-        var pick by remember { mutableStateOf(if (s.activeSources.isEmpty()) s.sources.map { it.pkg }.toSet() else s.activeSources) }
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { open = false },
-            containerColor = p.bar, titleContentColor = p.ink, textContentColor = p.ink,
-            title = { Text("Datenquellen", style = Type.title) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Gezählt wird nur, was angehakt ist.",
-                        style = Type.small, color = p.muted)
-                    s.sources.forEach { src ->
-                        val on = src.pkg in pick
-                        Row(Modifier.fillMaxWidth().clickable { pick = if (on) pick - src.pkg else pick + src.pkg }.padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.material3.Checkbox(on, { pick = if (on) pick - src.pkg else pick + src.pkg },
-                                colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = p.move, uncheckedColor = p.muted, checkmarkColor = p.bg))
-                            Column {
-                                Text(src.label + if (SourceStore.isBand(src)) " (dein Band)" else "", style = Type.body, color = p.ink)
-                                Text("seit ${src.firstDay.format(DateTimeFormatter.ofPattern("d. MMMM", DE))}, an ${src.days} ${if (src.days == 1) "Tag" else "Tagen"}",
-                                    style = Type.small, color = p.muted)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                androidx.compose.material3.TextButton({ SourceStore.save(ctx, pick); open = false; refresh() }, enabled = pick.isNotEmpty()) {
-                    Text("Übernehmen", style = Type.title.copy(fontSize = 15.sp), color = p.ink)
-                }
-            },
-            dismissButton = { androidx.compose.material3.TextButton({ open = false }) { Text("Abbrechen", style = Type.body, color = p.muted) } },
-        )
-    }
 }
 
 // ---------- Heute ----------
-// Hauptelement: die Ringe. Sie wachsen mit dem Bildschirm, alles darunter bleibt kompakt.
+// Hauptelement: die Ringe. Antippen öffnet die Details, alles darunter bleibt kompakt.
 
 @Composable
 fun TodayScreen(s: Snapshot) {
     val p = LocalPalette.current
     val today = LocalDate.now()
     val r = reveal()
+    val open = LocalOpenSheet.current
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    var goals by remember { mutableStateOf(GoalStore.load(ctx)) }
+    var goals by remember(s) { mutableStateOf(GoalStore.load(ctx)) }
     Page { avail ->
-        // feste Teile: Kopf 56, Werte 56, Woche 62, Tag 30+170, Zahlen 58, Abstände ~70
-        val ring = (avail - 502.dp).coerceIn(150.dp, 280.dp)
+        // feste Teile: Kopf 56, Werte 64, Woche 62, Tag 30+170, Zahlen 58, Abstände ~70
+        val ring = (avail - 510.dp).coerceIn(150.dp, 280.dp)
         Column {
             Text(today.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE)), style = Type.title, color = p.muted)
             SourceLine(s)
@@ -186,39 +164,54 @@ fun TodayScreen(s: Snapshot) {
             DayStrip(today, s.hrToday, s.sleep, s.workouts, Modifier.fillMaxWidth().height(170.dp))
         }
         val night = s.sleep.lastOrNull()?.takeIf { it.date == today }
+        val rec = s.recoveryToday
         Row(Modifier.fillMaxWidth()) {
-            Stat("km", "%.1f".format(s.distanceM / 1000 * r), null, Modifier.weight(1f))
-            Stat("Schlaf", night?.let { dur((it.asleepMinutes * r).toLong()) } ?: "–", null, Modifier.weight(1f))
-            Stat("Ruhepuls", s.restingHr.lastOrNull()?.let { (it.value * r).roundToInt().toString() } ?: "–", null, Modifier.weight(1f))
+            Stat("km", "%.1f".format(s.distanceM / 1000 * r), null, Modifier.weight(1f), onClick = { open(Sheet.Activity) })
+            Stat("Schlaf", night?.let { dur((it.asleepMinutes * r).toLong()) } ?: "–", null, Modifier.weight(1f), onClick = { open(Sheet.SleepScore) })
+            Stat(rec?.label ?: "Erholung", rec?.let { (it.score * r).roundToInt().toString() } ?: "–", null, Modifier.weight(1f),
+                color = if (rec != null) p.heart else p.ink, onClick = { open(Sheet.Recovery) })
         }
     }
 }
 
 // ---------- Fitness ----------
-// Hauptelement: die Schrittwoche. Kalorien kompakt; Trainings so viele, wie Platz haben.
+// Hauptelement: die Belastung der Woche, nach Pulszonen gestapelt. Darunter Schritte und Trainings.
 
 @Composable
 fun FitnessScreen(s: Snapshot) {
     val p = LocalPalette.current
+    val open = LocalOpenSheet.current
     val goal = GoalStore.load(androidx.compose.ui.platform.LocalContext.current).steps.toDouble()
     Page { avail ->
-        val stepsH = (avail * 0.40f).coerceIn(200.dp, 290.dp)
-        val kcalH = 150.dp
+        val loadH = (avail * 0.38f).coerceIn(190.dp, 280.dp)
+        val stepsH = 150.dp
         val rowH = 54.dp
-        val fit = ((avail - stepsH - kcalH - 34.dp * 3 - 60.dp).value / rowH.value).toInt().coerceIn(1, 6)
+        val fit = ((avail - loadH - stepsH - 34.dp * 3 - 60.dp).value / rowH.value).toInt().coerceIn(1, 5)
 
-        val avg = s.stepsWeek.map { it.value }.average()
-        Group("Schritte", if (!avg.isNaN()) "Schnitt ${avg.grouped()}" else null) {
-            if (s.stepsWeek.isNotEmpty()) DayBars(s.stepsWeek, p.move, goal, Modifier.fillMaxWidth().height(stepsH))
+        val l = load(s.days)
+        Group("Belastung", l?.short, onClick = { open(Sheet.Load) }) {
+            LoadBars(s.days7, loadBand(s.days), Modifier.fillMaxWidth().height(loadH))
         }
-        Group("Kalorien", "kcal") {
-            if (s.kcalWeek.any { it.value > 0 }) DayBars(s.kcalWeek, p.awake, modifier = Modifier.fillMaxWidth().height(kcalH))
+        val avg = s.stepsWeek.map { it.value }.average()
+        Group("Schritte", if (!avg.isNaN()) "Schnitt ${avg.grouped()}" else null, onClick = { open(Sheet.Activity) }) {
+            if (s.stepsWeek.isNotEmpty()) DayBars(s.stepsWeek, p.move, goal, Modifier.fillMaxWidth().height(stepsH))
         }
         Group("Trainings", s.vo2max?.let { "VO₂max %.0f".format(it) }) {
             if (s.workouts.isEmpty()) Note("Keine in den letzten 30 Tagen")
-            s.workouts.take(fit).forEach { w ->
-                Row(Modifier.fillMaxWidth().height(rowH), verticalAlignment = Alignment.CenterVertically) {
-                    Canvas(Modifier.size(8.dp)) { drawCircle(p.move) }
+            val zc = zoneColors()
+            s.workouts.take(fit).forEachIndexed { i, w ->
+                Row(
+                    Modifier.fillMaxWidth().height(rowH).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .clickable { open(Sheet.Workout(i)) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Zonenverteilung als kleiner senkrechter Streifen statt eines Punkts
+                    Canvas(Modifier.width(6.dp).height(34.dp)) {
+                        val tot = w.zoneMin.sum()
+                        if (tot == 0) { drawRoundRect(p.move, cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f)); return@Canvas }
+                        var y = size.height
+                        w.zoneMin.forEachIndexed { z, m -> val h = size.height * m / tot; drawRect(zc[z], Offset(0f, y - h), Size(size.width, h)); y -= h }
+                    }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(w.title, style = Type.title.copy(fontSize = 16.sp, lineHeight = 20.sp), color = p.ink)
@@ -238,37 +231,44 @@ fun FitnessScreen(s: Snapshot) {
 }
 
 // ---------- Schlaf ----------
-// Hauptelement: das Hypnogramm (mit Höchstmass). Phasen als ein geteilter Balken.
+// Hauptelement: das Hypnogramm (mit Höchstmass). Schlafwert neben der Dauer, Rhythmus als schwebende Balken.
 
 @Composable
 fun SleepScreen(s: Snapshot) {
     val p = LocalPalette.current
+    val open = LocalOpenSheet.current
     val n = s.sleep.lastOrNull()
     Page { avail ->
         if (n == null) {
             Group("Schlaf") { Note("Noch keine Nacht erfasst") }
             return@Page
         }
-        val many = s.sleep.size > 1
+        val many = true   // 14 feste Plätze: auch mit wenigen Nächten ein ruhiges Bild
         val fixed = 30.dp + 100.dp + 40.dp + 86.dp + (if (many) 210.dp else 0.dp) + 60.dp
         val hypH = (avail - fixed).coerceIn(150.dp, 240.dp)
+        val score = s.sleepScores[n.date]
         Column {
             Text("Nacht auf ${n.date.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", DE))}", style = Type.title, color = p.muted)
             Row(verticalAlignment = Alignment.Bottom) {
                 Big(dur((n.asleepMinutes * reveal()).toLong()), "h", 88, color = p.ink)
                 Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(bottom = 12.dp)) {
-                    Text("${hhmm(n.start)} bis ${hhmm(n.end)}", style = Type.body, color = p.ink)
-                    val inBed = Duration.between(n.start, n.end).toMinutes()
-                    Text("${n.asleepMinutes * 100 / inBed.coerceAtLeast(1)} % im Bett", style = Type.small, color = p.muted)
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.padding(bottom = 10.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                        .clickable { open(Sheet.SleepScore) }.padding(4.dp),
+                ) {
+                    if (score != null) Row(verticalAlignment = Alignment.Bottom) {
+                        Text("${(score.total * reveal()).roundToInt()}", style = Type.numeral.copy(fontSize = 40.sp, lineHeight = 40.sp), color = p.sleep)
+                        Text(" ${score.label}", style = Type.small, color = p.sleep, modifier = Modifier.padding(bottom = 5.dp))
+                    }
+                    Text("${hhmm(n.start)} bis ${hhmm(n.end)}", style = Type.small, color = p.muted)
                 }
             }
         }
         Group("Phasen") { Hypnogram(n, Modifier.fillMaxWidth().height(hypH)) }
         if (n.stages.isNotEmpty()) StageSummary(n)
-        if (many) Group("Dauer", "Schnitt ${dur(s.sleep.map { it.asleepMinutes }.average().toLong())} h") {
-            DayBars(s.sleep.takeLast(14).map { DayValue(it.date, it.asleepMinutes / 60.0) }, p.sleep, goal = 8.0,
-                modifier = Modifier.fillMaxWidth().height(170.dp), format = { "${dur((it * 60).toLong())} h" })
+        if (many) Group("Rhythmus", "Schnitt ${dur(s.sleep.takeLast(14).map { it.asleepMinutes }.average().toLong())} h") {
+            SleepWindows(s.sleep.takeLast(14), Modifier.fillMaxWidth().height(170.dp))
         }
     }
 }
@@ -313,30 +313,33 @@ private fun StageSummary(n: SleepNight) {
 }
 
 // ---------- Gesundheit ----------
-// Messreihen statt Kacheln: jede Zeile ein Instrument, gleichmässig über die Höhe verteilt.
+// Hauptelement: die Erholung als Bogen. Darunter die Nachtwerte mit persönlichem Normalbereich.
 
 @Composable
 fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
     val p = LocalPalette.current
-    val latest = listOf(s.restingHr, s.hrv, s.spo2, s.respRate).mapNotNull { it.lastOrNull()?.date }.maxOrNull()
-    Page {
-        Text(
-            latest?.let { if (it == LocalDate.now()) "Letzte Nacht" else "Nacht auf " + it.format(DateTimeFormatter.ofPattern("EEEE", DE)) }
-                ?: "Noch keine Nacht",
-            style = Type.numeral.copy(fontSize = 40.sp, lineHeight = 44.sp), color = p.ink,
-        )
-        // nur Werte zeigen, die das Band wirklich liefert
-        val rows = buildList {
-            if (s.restingHr.isNotEmpty()) add(Triple("Ruhepuls", s.restingHr, Triple("bpm", "%.0f", p.heart)))
-            if (s.hrv.isNotEmpty()) add(Triple("HRV", s.hrv, Triple("ms", "%.0f", p.heart)))
-            if (s.spo2.isNotEmpty()) add(Triple("Sauerstoff", s.spo2, Triple("%", "%.1f", p.sleep)))
-            if (s.respRate.isNotEmpty()) add(Triple("Atemfrequenz", s.respRate, Triple("/min", "%.1f", p.sleep)))
-            s.weightKg?.let { add(Triple("Gewicht", listOf(DayValue(LocalDate.now(), it)), Triple("kg", "%.1f", p.move))) }
+    val open = LocalOpenSheet.current
+    val vs = vitals(s)
+    val off = outOfRangeToday(s)
+    Page { avail ->
+        val rowsH = vs.size * 92 + 60
+        val gauge = (avail - rowsH.dp - 40.dp).coerceIn(130.dp, 230.dp)
+        Box(
+            Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp)).clickable { open(Sheet.Recovery) },
+            contentAlignment = Alignment.Center,
+        ) {
+            val rec = s.recoveryToday
+            if (rec != null) Gauge(rec.score, rec.label, gauge, p.heart)
+            else {
+                val n = minOf(s.hrv.size, s.restingHr.size)
+                BaselineGauge(n, gauge, p.heart, if (n < MIN_BASELINE) "Nächte bis zur Erholung" else "wartet auf die Nachtwerte")
+            }
         }
-        Column(Modifier.fillMaxWidth().weight(1f).padding(vertical = 16.dp)) {
-            if (rows.isEmpty()) Note("Trag das Band in der Nacht, dann erscheinen hier deine Werte.")
-            rows.forEach { (label, data, f) ->
-                MetricRow(label, data, f.first, f.second, f.third, trend = label != "Gewicht", modifier = Modifier.weight(1f))
+        if (off.size >= 2) Text("${off.joinToString(" und ") { it.label }} ungewohnt", style = Type.small, color = p.awake)
+        Column(Modifier.fillMaxWidth().weight(1f)) {
+            if (vs.isEmpty()) Note("Trag das Band in der Nacht, dann erscheinen hier deine Werte.")
+            vs.forEach { v ->
+                MetricRow(v, if (v.key == "rhr" || v.key == "hrv") p.heart else p.sleep, Modifier.weight(1f).clickable { open(Sheet.Vital(v.key)) })
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -346,55 +349,67 @@ fun HealthScreen(s: Snapshot, footer: @Composable () -> Unit = {}) {
     }
 }
 
+/** Platzhalter für die Erholung: die Nächte bis zur ersten Berechnung als Bogen-Segmente. */
+@Composable
+private fun BaselineGauge(nights: Int, size: androidx.compose.ui.unit.Dp, color: Color, caption: String) {
+    val p = LocalPalette.current
+    val r = reveal()
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val sw = this.size.width * .085f
+            val tl = Offset(sw / 2, sw / 2); val sz = Size(this.size.width - sw, this.size.height - sw)
+            val seg = 270f / MIN_BASELINE
+            for (i in 0 until MIN_BASELINE) {
+                val on = i < nights
+                drawArc(if (on) color.copy(alpha = r) else p.track, 135f + i * seg + 3f, seg - 6f, false, tl, sz, style = Stroke(sw, cap = StrokeCap.Butt))
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(if (nights < MIN_BASELINE) "${nights.coerceAtMost(MIN_BASELINE)}/$MIN_BASELINE" else "–",
+                style = Type.numeral.copy(fontSize = (size.value * .26f).sp, lineHeight = (size.value * .26f).sp), color = p.ink)
+            Text(caption, style = Type.small, color = p.muted)
+        }
+    }
+}
+
 /**
- * Eine Messreihe: links Wert, rechts Verlauf. Solange weniger als 4 Messtage vorliegen,
- * zeigen vier Punkte, wie weit dein persönlicher Schnitt aufgebaut ist.
+ * Eine Nachtmetrik: links der Wert, rechts der Verlauf mit Normalbereich.
+ * Vor 4 Nächten zeigen vier Punkte, wie weit der Verlauf aufgebaut ist.
  */
 @Composable
-private fun MetricRow(label: String, data: List<DayValue>, unit: String, fmt: String, color: Color, trend: Boolean = true, modifier: Modifier = Modifier) {
+private fun MetricRow(v: Vital, color: Color, modifier: Modifier) {
     val p = LocalPalette.current
     val need = 4
+    val last = v.last ?: return
     Column(modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(p.track))
-        // Inhalt mittig zwischen den Trennlinien
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-        // Zahl wächst mit der Zeilenhöhe: wenige Werte = grössere Zahlen statt Leerraum
-        val num = (maxHeight.value * 0.34f).coerceIn(44f, 88f).toInt()
-        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Canvas(Modifier.size(8.dp)) { drawCircle(color) }
-                    Spacer(Modifier.width(8.dp))
-                    Text(label, style = Type.small, color = p.ink)
+            val num = (maxHeight.value * 0.34f).coerceIn(36f, 72f).toInt()
+            Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Canvas(Modifier.size(8.dp)) { drawCircle(color) }
+                        Spacer(Modifier.width(8.dp))
+                        Text(v.label, style = Type.small, color = p.ink)
+                        if (v.inRange == false) Text("  ausserhalb", style = Type.small, color = p.awake)
+                    }
+                    Big(v.fmt.format(last.value * reveal()), v.unit, num)
                 }
-                if (data.isEmpty()) Text("–", style = Type.numeral.copy(fontSize = num.sp, lineHeight = (num * 1.05).sp), color = p.muted)
-                else Big(fmt.format(data.last().value * reveal()), unit, num)
-            }
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(132.dp).padding(bottom = 6.dp)) {
-                when {
-                    data.isEmpty() -> Text("Keine Werte", style = Type.small, color = p.muted)
-                    !trend -> {}
-                    data.size < need -> {
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(140.dp)) {
+                    if (v.values.size < need) {
                         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            repeat(need) { i -> Canvas(Modifier.size(7.dp)) { drawCircle(if (i < data.size) color else p.track) } }
+                            repeat(need) { i -> Canvas(Modifier.size(7.dp)) { drawCircle(if (i < v.values.size) color else p.track) } }
                         }
                         Spacer(Modifier.height(6.dp))
                         Text("Verlauf ab $need Nächten", style = Type.small, color = p.muted)
-                    }
-                    else -> {
-                        val before = data.dropLast(1).map { it.value }.average()
-                        val delta = data.last().value - before
-                        Spark(data, color, Modifier.fillMaxWidth().height(34.dp))
+                    } else {
+                        RangeChart(v.values.takeLast(30), v.range, color, Modifier.fillMaxWidth().height(44.dp), dots = false)
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            if (fmt.format(abs(delta)).trimStart('0', '.').isEmpty()) "wie dein Schnitt"
-                            else "${if (delta > 0) "+" else "−"}${fmt.format(abs(delta))} zum Schnitt",
-                            style = Type.small, color = p.muted,
-                        )
+                        Text(v.range?.let { "Bereich ${v.fmt.format(it.low)} bis ${v.fmt.format(it.high)}" } ?: "Bereich ab $MIN_BASELINE Nächten",
+                            style = Type.small, color = p.muted)
                     }
                 }
             }
         }
     }
-        }
 }

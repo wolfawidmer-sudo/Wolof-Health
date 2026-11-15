@@ -113,6 +113,9 @@ class MainVm(app: Application) : AndroidViewModel(app) {
     var refreshing by mutableStateOf(false); private set
     private var repo: HealthRepo? = null
 
+    /** Alle Rechte inkl. Verlauf und Hintergrund, soweit das Gerät sie kennt. */
+    fun allPermissions(): Set<String> = PERMISSIONS + runCatching { (repo ?: HealthRepo(getApplication())).extraPermissions() }.getOrDefault(emptySet())
+
     fun refresh() {
         val ctx = getApplication<Application>()
         if (HealthConnectClient.getSdkStatus(ctx) != HealthConnectClient.SDK_AVAILABLE) {
@@ -122,7 +125,11 @@ class MainVm(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             refreshing = true
             state = try {
-                if (r.granted().isEmpty()) UiState.NeedsPermission else UiState.Ready(r.load())
+                if (r.granted().isEmpty()) UiState.NeedsPermission else UiState.Ready(r.load().also { snap ->
+                    // Widget, Hinweise und Erinnerung im Hintergrund nachziehen
+                    viewModelScope.launch { runCatching { ch.widmer.airview.work.AfterLoad.run(ctx, snap, fromBackground = false) } }
+                    ch.widmer.airview.work.Scheduler.periodic(ctx)
+                })
             } catch (e: Exception) {
                 UiState.Error(e.message ?: e.javaClass.simpleName)
             }
@@ -146,12 +153,22 @@ fun App(vm: MainVm = viewModel()) {
     val launcher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract()
     ) { vm.refresh() }
-    LaunchedEffect(Unit) { vm.refresh(); vm.checkUpdate() }
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) { vm.refresh(); vm.checkUpdate() }
+    val notif = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(vm.state is UiState.Ready) {
+        if (vm.state is UiState.Ready && android.os.Build.VERSION.SDK_INT >= 33) {
+            val prefs = ctx.getSharedPreferences("app", android.content.Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("notifAsked", false)) {
+                prefs.edit().putBoolean("notifAsked", true).apply()
+                notif.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
 
     when (val st = vm.state) {
         is UiState.Ready -> Pages(
-            st.data, vm.refreshing, onRefresh = { vm.refresh(); vm.checkUpdate() }, onPermissions = { launcher.launch(PERMISSIONS) },
+            st.data, vm.refreshing, onRefresh = { vm.refresh(); vm.checkUpdate() }, onPermissions = { launcher.launch(vm.allPermissions()) },
             update = vm.update, updateVisible = !vm.updateDismissed,
             onInstall = vm::installUpdate, onDismissUpdate = { vm.updateDismissed = true }, onCheckUpdate = { vm.checkUpdate(manual = true) },
         )
@@ -171,7 +188,7 @@ fun App(vm: MainVm = viewModel()) {
                         "Zugriff erlauben",
                         "Die Daten bleiben auf dem Telefon.",
                         "Zugriff erlauben",
-                    ) { launcher.launch(PERMISSIONS) }
+                    ) { launcher.launch(vm.allPermissions()) }
                     is UiState.Error -> Gate("Daten konnten nicht geladen werden", st.msg, "Erneut versuchen") { vm.refresh() }
                     else -> {}
                 }
@@ -222,7 +239,9 @@ fun Pages(
         reveals.forEachIndexed { i, a -> if (i != pager.settledPage && i != pager.targetPage) a.snapTo(0f) }
     }
 
-    CompositionLocalProvider(LocalPalette provides live) {
+    var sheet by remember { mutableStateOf<Sheet?>(null) }
+    CompositionLocalProvider(LocalPalette provides live, LocalOpenSheet provides { sheet = it }, LocalRefresh provides onRefresh,
+        LocalRequestAccess provides onPermissions) {
         Box(Modifier.fillMaxSize().background(live.bg)) {
             PullToRefreshBox(refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize().statusBarsPadding()) {
                 HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1) { page ->
@@ -269,6 +288,8 @@ fun Pages(
                 onSelect = { scope.launch { pager.animateScrollToPage(it, animationSpec = spring(dampingRatio = .85f, stiffness = 300f)) } },
                 modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
             )
+            // Detailansichten in der Farbe der aktuellen Seite
+            SheetHost(sheet, data) { sheet = null }
         }
     }
 }

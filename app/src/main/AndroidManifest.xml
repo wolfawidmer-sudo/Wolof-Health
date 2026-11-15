@@ -15,6 +15,10 @@
     <uses-permission android:name="android.permission.health.READ_EXERCISE" />
     <uses-permission android:name="android.permission.health.READ_VO2_MAX" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <!-- Verlauf über 30 Tage und Lesen im Hintergrund (für Widget und Hinweise) -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- nur für den Update-Check: es werden keine Gesundheitsdaten übertragen -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -56,5 +60,12 @@
             </intent-filter>
         </activity-alias>
         <receiver android:name=".update.InstallReceiver" android:exported="false" />
+
+        <receiver android:name=".widget.RingsWidgetReceiver" android:exported="true" android:label="Ringe">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/rings_widget" />
+        </receiver>
     </application>
 </manifest>
