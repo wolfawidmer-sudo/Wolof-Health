@@ -12,6 +12,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -240,10 +243,11 @@ fun Pages(
     }
 
     var sheet by remember { mutableStateOf<Sheet?>(null) }
+    val haze = remember { dev.chrisbanes.haze.HazeState() }
     CompositionLocalProvider(LocalPalette provides live, LocalOpenSheet provides { sheet = it }, LocalRefresh provides onRefresh,
         LocalRequestAccess provides onPermissions) {
         Box(Modifier.fillMaxSize().background(live.bg)) {
-            PullToRefreshBox(refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+            PullToRefreshBox(refreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize().hazeSource(haze).statusBarsPadding()) {
                 HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1) { page ->
                     val offset = ((pager.currentPage - page) + pager.currentPageOffsetFraction).absoluteValue
                     CompositionLocalProvider(
@@ -283,6 +287,7 @@ fun Pages(
                 enter = slideInVertically { -it } + fadeIn(), exit = slideOutVertically { -it } + fadeOut(),
             ) { UpdateBanner(update, onInstall, onDismissUpdate) }
             TaskBar(
+                haze = haze,
                 pos = pos, tabs = tabs,
                 accent = { t -> when (t) { Tab.Heute -> live.ink; Tab.Fitness -> live.move; Tab.Schlaf -> live.sleep; Tab.Gesundheit -> live.heart } },
                 onSelect = { scope.launch { pager.animateScrollToPage(it, animationSpec = spring(dampingRatio = .85f, stiffness = 300f)) } },
@@ -299,7 +304,7 @@ fun Pages(
  * und nimmt die Farbe des Datentyps der Seite an.
  */
 @Composable
-fun TaskBar(pos: Float, tabs: List<Tab>, accent: (Tab) -> Color, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+fun TaskBar(haze: dev.chrisbanes.haze.HazeState? = null, pos: Float, tabs: List<Tab>, accent: (Tab) -> Color, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
     val p = LocalPalette.current
     val haptic = LocalHapticFeedback.current
     var width by remember { mutableIntStateOf(0) }
@@ -308,18 +313,40 @@ fun TaskBar(pos: Float, tabs: List<Tab>, accent: (Tab) -> Color, onSelect: (Int)
     val i0 = pos.toInt().coerceIn(0, tabs.lastIndex)
     val i1 = (i0 + 1).coerceAtMost(tabs.lastIndex)
     val indicatorColor = androidx.compose.ui.graphics.lerp(accent(tabs[i0]), accent(tabs[i1]), pos - i0)
+    val shape = RoundedCornerShape(28.dp)
+    val light = Color.White
+    // Glas: Unschärfe des Hintergrunds, leichte Tönung in der Seitenfarbe, helle Kante oben, dunklere unten
+    val glass = dev.chrisbanes.haze.HazeStyle(
+        backgroundColor = p.bg,
+        tints = listOf(dev.chrisbanes.haze.HazeTint(p.bar.copy(alpha = if (p.isDark) .55f else .5f))),
+        blurRadius = 26.dp,
+        noiseFactor = .06f,
+    )
+    val edge = androidx.compose.ui.graphics.Brush.verticalGradient(
+        listOf(light.copy(alpha = if (p.isDark) .32f else .9f), light.copy(alpha = if (p.isDark) .06f else .25f), Color.Black.copy(alpha = if (p.isDark) .25f else .06f)),
+    )
+    val sheen = androidx.compose.ui.graphics.Brush.verticalGradient(
+        0f to light.copy(alpha = if (p.isDark) .10f else .35f), .45f to Color.Transparent,
+    )
 
     Box(
         modifier.fillMaxWidth().height(68.dp)
-            .shadow(18.dp, RoundedCornerShape(26.dp), ambientColor = Color.Black.copy(.25f), spotColor = Color.Black.copy(.25f))
-            .clip(RoundedCornerShape(26.dp)).background(p.bar).onSizeChanged { width = it.width },
+            .shadow(24.dp, shape, ambientColor = Color.Black.copy(.18f), spotColor = Color.Black.copy(.22f))
+            .clip(shape)
+            .then(if (haze != null) Modifier.hazeEffect(haze, glass) else Modifier.background(p.bar.copy(alpha = .92f)))
+            .background(sheen)
+            .border(1.dp, edge, shape)
+            .onSizeChanged { width = it.width },
     ) {
-        // gleitende Markierung
+        // gleitende Markierung, selbst ein kleines Glasstück in der Farbe der Seite
+        val pill = RoundedCornerShape(22.dp)
         Box(
             Modifier.padding(6.dp).width(slotW - 12.dp).fillMaxHeight()
                 .offset(x = slotW * pos)
-                .clip(RoundedCornerShape(20.dp))
-                .background(indicatorColor.copy(alpha = if (p.isDark) .22f else .13f)),
+                .clip(pill)
+                .background(indicatorColor.copy(alpha = if (p.isDark) .24f else .16f))
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(light.copy(alpha = if (p.isDark) .10f else .45f), Color.Transparent)))
+                .border(1.dp, androidx.compose.ui.graphics.Brush.verticalGradient(listOf(light.copy(alpha = if (p.isDark) .28f else .8f), light.copy(alpha = .05f))), pill),
         )
         Row(Modifier.fillMaxSize()) {
             tabs.forEachIndexed { i, t ->

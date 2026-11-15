@@ -14,8 +14,8 @@ android {
         applicationId = "ch.widmer.airview"
         minSdk = 28
         targetSdk = 35
-        versionCode = 16
-        versionName = "2.0"
+        versionCode = 17
+        versionName = "2.1"
         buildConfigField("String", "UPDATE_URL", "\"https://raw.githubusercontent.com/wolfawidmer-sudo/wolof-health/main/updates/version.json\"")
     }
     // Fester Release-Schlüssel – liegt NICHT im Repo (siehe README). Ohne ihn baut kein Release.
@@ -60,6 +60,8 @@ dependencies {
     implementation("androidx.health.connect:connect-client:1.1.0")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
     implementation("androidx.glance:glance-appwidget:1.1.1")
+    // Hintergrund-Unschärfe für die Glas-Leiste (Android 12+, darunter durchscheinende Fläche)
+    implementation("dev.chrisbanes.haze:haze:1.6.10")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("io.github.takahirom.roborazzi:roborazzi:1.43.0")
